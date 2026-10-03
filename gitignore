@@ -1,0 +1,93 @@
+# ============================================================
+# .gitignore — DataFest: propensión de conversión
+# Regla general: en el repositorio va el CÓDIGO, no los datos ni los secretos.
+# Cada integrante guarda train.csv / test.csv de forma local en data/.
+# ============================================================
+
+# ---------- Datasets (pesados y/o confidenciales) ----------
+# Se ignora todo lo que haya dentro de data/ ...
+data/*
+# ... excepto lo que sirve para documentar (sin datos de clientes) y mantener la carpeta
+!data/.gitkeep
+!data/DATASET_DESCRIPTION.md
+!data/metaData.csv
+
+# Por si alguien deja los CSV en la raíz (p. ej. usando --datos .)
+/train.csv
+/test.csv
+/sample_submission.csv
+
+# Otros formatos de datos y artefactos pesados
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.joblib
+*.ubj
+*.npy
+*.npz
+*.h5
+
+# ---------- Resultados generados por el pipeline ----------
+# submission.csv, resultados_validacion.csv, features_seleccionadas.txt, etc.
+# (derivan de los datos de la competencia; se regeneran con pipeline.py)
+salida/*
+!salida/.gitkeep
+
+# ---------- Secretos y credenciales (NUNCA subir) ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+*.secret
+kaggle.json
+.kaggle/
+.aws/
+.ssh/
+
+# ---------- Optuna / bases de datos locales ----------
+*.db
+*.sqlite
+*.sqlite3
+optuna_*.log
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- Jupyter / Colab ----------
+.ipynb_checkpoints/
+
+# ---------- Logs ----------
+*.log
+
+# ---------- Sistema operativo y editores ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
