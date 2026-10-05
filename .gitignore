@@ -1,0 +1,155 @@
+# ============================================================
+# .gitignore — DataFest: propensión de conversión
+# Regla general: en el repositorio va el CÓDIGO y DOCUMENTACIÓN, no los datos pesados ni secretos.
+# ============================================================
+
+# ---------- Datasets (pesados y/o confidenciales) ----------
+# Se ignora todo lo que haya dentro de datos_entrada/ ...
+datos_entrada/*
+# ... excepto metadatos y descripción
+!datos_entrada/.gitkeep
+!datos_entrada/metaData.csv
+!datos_entrada/DATASET_DESCRIPTION.md
+
+# Por si alguien deja los CSV en la raíz (p. ej. usando --datos .)
+/train.csv
+/test.csv
+/sample_submission.csv
+
+# Otros formatos de datos y artefactos pesados
+*.parquet
+*.feather
+*.pkl
+*.pickle
+*.joblib
+*.ubj
+*.npy
+*.npz
+*.h5
+*.keras
+
+# ---------- Resultados generados por el pipeline ----------
+# submission.csv, resultados_validacion.csv, features_seleccionadas.txt, etc.
+# (derivan de los datos de la competencia; se regeneran con pipeline.py)
+resultados_reportes/*
+!resultados_reportes/.gitkeep
+
+# ---------- Modelos entrenados (pesados) ----------
+modelos/*
+!modelos/.gitkeep
+
+# ---------- Secretos y credenciales (NUNCA subir) ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+*.secret
+kaggle.json
+.kaggle/
+.aws/
+.ssh/
+
+# ---------- Optuna / bases de datos locales ----------
+*.db
+*.sqlite
+*.sqlite3
+optuna_*.log
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- Jupyter / Colab ----------
+.ipynb_checkpoints/
+
+# ---------- Logs ----------
+*.log
+
+# ---------- Sistema operativo y editores ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~
+
+# ---------- Secretos y credenciales (NUNCA subir) ----------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials.json
+secrets.json
+secrets.yaml
+secrets.yml
+*.secret
+kaggle.json
+.kaggle/
+.aws/
+.ssh/
+
+# ---------- Optuna / bases de datos locales ----------
+*.db
+*.sqlite
+*.sqlite3
+optuna_*.log
+
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Entornos virtuales
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- Jupyter / Colab ----------
+.ipynb_checkpoints/
+
+# ---------- Logs ----------
+*.log
+
+# ---------- Sistema operativo y editores ----------
+.DS_Store
+Thumbs.db
+desktop.ini
+.idea/
+.vscode/
+*.swp
+*~

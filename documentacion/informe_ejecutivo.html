@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Informe DataFest 2026 - Modelo Propensión Conversión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600;800&family=Public+Sans:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#fbfaf7;--ink:#14213d;--mute:#53607a;--line:#d9dde6;--teal:#0f8b8d;--amber:#e9a23b;--card:#ffffff;--good:#e3f4ee;--bad:#fbe9e7;--code:#eef1f6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0e1526;--ink:#eef1f7;--mute:#a3adc4;--line:#2a3550;--teal:#4fc3c5;--amber:#f0b45a;--card:#151e36;--good:#12352f;--bad:#3a1f22;--code:#1a2440}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 "Public Sans",system-ui,sans-serif}
+main{max-width:960px;margin:0 auto;padding:40px 22px 64px}
+header{border-left:8px solid var(--amber);padding-left:20px;margin-bottom:40px}
+h1,h2,h3{font-family:Fraunces,Georgia,serif;line-height:1.2}
+h1{font-size:2.3rem;font-weight:800;margin:0 0 8px}
+header p{margin:0;color:var(--mute)}
+h2{font-size:1.65rem;margin:52px 0 6px;padding-top:18px;border-top:3px solid var(--teal)}
+h3{font-size:1.15rem;margin:26px 0 6px;color:var(--teal)}
+p,li{max-width:80ch}
+strong{color:var(--ink)}
+.box{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--teal);padding:14px 18px;margin:18px 0}
+.scroll{overflow-x:auto;margin:16px 0}
+table{border-collapse:collapse;width:100%;min-width:520px;background:var(--card)}
+th,td{border:1px solid var(--line);padding:8px 12px;text-align:left;vertical-align:top}
+th{background:var(--code);font-weight:600}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+td.g{background:var(--good)}td.b{background:var(--bad)}
+pre{background:var(--code);border:1px solid var(--line);padding:16px;overflow-x:auto;font:13px/1.45 ui-monospace,Menlo,Consolas,monospace;margin:16px 0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin:24px 0}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px;text-align:center}
+.kpi .val{font:700 2.5rem/1.1 Fraunces,Georgia,serif;color:var(--teal)}
+.kpi .lab{color:var(--mute);font-size:0.9rem;margin-top:4px}
+.badge{display:inline-block;background:var(--teal);color:#fff;padding:2px 8px;border-radius:4px;font-size:0.8rem;font-weight:600}
+.badge.warn{background:var(--amber)}
+@media(max-width:640px){.two{grid-template-columns:1fr}h1{font-size:1.8rem}}
+@media print{body{background:#fff;color:#000}:root{--bg:#fff;--card:#fff}h2{break-after:avoid}table,pre,.box{break-inside:avoid}main{padding:0}}
+</style>
+</head>
+<body>
+<main>
+<header>
+<h1>DataFest 2026</h1>
+<p>Modelo de Propensión de Conversión Bancaria — Informe Ejecutivo</p>
+</header>
+
+<section>
+<h2>1. Resultado Principal <span class="badge">Gini 0.2505</span></h2>
+<div class="kpi-grid">
+<div class="kpi"><div class="val">0.2505</div><div class="lab">Mejor Gini (Validación)</div></div>
+<div class="kpi"><div class="val">0.6252</div><div class="lab">Mejor AUC (Validación)</div></div>
+<div class="kpi"><div class="val">50</div><div class="lab">Features Finales</div></div>
+<div class="kpi"><div class="val">9,900</div><div class="lab">Predicciones Test</div></div>
+</div>
+<div class="box"><strong>Modelo ganador:</strong> LightGBM + Optuna (Pipeline DF_WCB / DF_New) — Entrenado con 100% train, promedio 3 semillas.</div>
+</section>
+
+<section>
+<h2>2. El Problema</h2>
+<div class="scroll"><table>
+<tr><th>Elemento</th><th>Detalle</th></tr>
+<tr><td><strong>Objetivo</strong></td><td>Predecir probabilidad de conversión (0–1) para clientes en <strong>diciembre 2026</strong></td></tr>
+<tr><td><strong>Entrenamiento</strong></td><td><code>train.csv</code>: Ene–Nov 2026 (110,100 filas, objetivo conocido)</td></tr>
+<tr><td><strong>Prueba</strong></td><td><code>test.csv</code>: Dic 2026 (9,900 filas, sin objetivo)</td></tr>
+<tr><td><strong>Granularidad</strong></td><td>Cliente-mes (<code>id_cliente</code>, <code>mes</code> AAAAMM)</td></tr>
+<tr><td><strong>Métrica</strong></td><td>Gini = 2×AUC−1 (solo importa el <strong>orden</strong> de predicciones)</td></tr>
+<tr><td><strong>Historial</strong></td><td>81% clientes test tienen historial en train; convertidos no reaparecen</td></tr>
+</table></div>
+</section>
+
+<section>
+<h2>3. Pipeline Técnico</h2>
+<pre>
+┌─────────────┐    ┌──────────────────┐    ┌────────────────┐    ┌──────────────┐    ┌──────────────────┐
+│  DATOS      │───▶│  FEATURE ENG.    │───▶│  FEATURE SEL.  │───▶│  MODELADO    │───▶│  SUBMISSION    │
+│  train+test │    │  Lags, deltas,   │    │  Var.cero →    │    │  LightGBM,   │    │  id_cliente,   │
+│  (120k filas)    │  ventanas 3m,    │    │  Corr >0.95 →  │    │  XGBoost,    │    │  prediccion    │
+└─────────────┘    │  TE temporal,    │    │  Top-K LGBM    │    │  CatBoost,   │    └──────────────┘
+                   │  OHE categóricas │    │  (50 finales)  │    │  RF + Optuna │
+                   └──────────────────┘    └────────────────┘    │  Val. Temporal│
+                                                                │  (3 últimos m)│
+                                                                └──────────────┘
+</pre>
+<div class="box"><strong>Reglas anti-leakage:</strong> Validación temporal (no aleatoria) • Lags/ventanas calendario-conscientes • Target Encoding solo con pasado • Selección features solo en train • Sin id_cliente/mes como predictoras</div>
+</section>
+
+<section>
+<h2>4. Features Más Importantes (Top 15)</h2>
+<div class="scroll"><table>
+<tr><th>Rank</th><th>Feature</th><th>Tipo</th><th>Descripción</th></tr>
+<tr><td class="num">1</td><td><code>numero_productos_roll3_mean</code></td><td>Temporal</td><td>Media móvil 3m nº productos</td></tr>
+<tr><td class="num">2</td><td><code>dias_ultima_transaccion_roll3_mean</code></td><td>Temporal</td><td>Media móvil 3m días última transacción</td></tr>
+<tr><td class="num">3</td><td><code>banda_riesgo_low</code></td><td>OHE</td><td>Banda riesgo = baja</td></tr>
+<tr><td class="num">4</td><td><code>ratio_deuda_ingresos</code></td><td>Original</td><td>Ratio deuda/ingresos</td></tr>
+<tr><td class="num">5</td><td><code>distancia_sucursal_km</code></td><td>Original</td><td>Distancia a sucursal</td></tr>
+<tr><td class="num">6</td><td><code>antiguedad_cuenta_meses</code></td><td>Original</td><td>Antigüedad cuenta</td></tr>
+<tr><td class="num">7</td><td><code>ingresos</code></td><td>Original</td><td>Ingresos cliente</td></tr>
+<tr><td class="num">8</td><td><code>saldo_promedio_roll3_mean</code></td><td>Temporal</td><td>Media móvil 3m saldo promedio</td></tr>
+<tr><td class="num">9</td><td><code>banda_riesgo_high</code></td><td>OHE</td><td>Banda riesgo = alta</td></tr>
+<tr><td class="num">10</td><td><code>antiguedad_direccion_meses</code></td><td>Original</td><td>Antigüedad dirección</td></tr>
+<tr><td class="num">11</td><td><code>dias_ultima_interaccion_lag3</code></td><td>Temporal</td><td>Lag 3m días última interacción</td></tr>
+<tr><td class="num">12</td><td><code>dias_ultima_interaccion_roll3_mean</code></td><td>Temporal</td><td>Media móvil 3m días última interacción</td></tr>
+<tr><td class="num">13</td><td><code>dias_ultima_interaccion_lag1</code></td><td>Temporal</td><td>Lag 1m días última interacción</td></tr>
+<tr><td class="num">14</td><td><code>dias_ultima_transaccion_roll3_sum</code></td><td>Temporal</td><td>Suma 3m días última transacción</td></tr>
+<tr><td class="num">15</td><td><code>dias_ultima_interaccion_delta1</code></td><td>Temporal</td><td>Cambio mensual días última interacción</td></tr>
+</table></div>
+<p><strong>Insight:</strong> <code>dias_ultima_interaccion</code> es la única variable que cambia mes a mes (~80% clientes); sus lags/ventanas dominan el top-20.</p>
+</section>
+
+<section>
+<h2>5. Comparativa de Modelos (Validación Temporal: 3 últimos meses)</h2>
+<div class="scroll"><table>
+<tr><th>Modelo</th><th class="num">AUC</th><th class="num">Gini</th><th class="num">Iteraciones</th><th>Pipeline</th></tr>
+<tr class="g"><td><strong>LightGBM + Optuna</strong></td><td class="num"><strong>0.6252</strong></td><td class="num"><strong>0.2505</strong></td><td class="num">189</td><td>DF_WCB / DF_New ⭐</td></tr>
+<tr><td>LightGBM</td><td class="num">0.6232</td><td class="num">0.2464</td><td class="num">46</td><td>DF_WCB / DF_New</td></tr>
+<tr><td>CatBoost</td><td class="num">0.6230</td><td class="num">0.2461</td><td class="num">288</td><td>DF_WCB</td></tr>
+<tr><td>XGBoost</td><td class="num">0.6225</td><td class="num">0.2451</td><td class="num">27</td><td>Todos</td></tr>
+<tr><td>RandomForest</td><td class="num">0.6204</td><td class="num">0.2407</td><td class="num">300</td><td>Todos</td></tr>
+<tr class="b"><td>LightGBM + Optuna (v1)</td><td class="num">0.6210</td><td class="num">0.2420</td><td class="num">25</td><td>DF_1 (inicial)</td></tr>
+<tr><td>XGBoost (v1)</td><td class="num">0.6191</td><td class="num">0.2382</td><td class="num">3</td><td>DF_1</td></tr>
+<tr><td>RandomForest (v1)</td><td class="num">0.6061</td><td class="num">0.2123</td><td class="num">300</td><td>DF_1</td></tr>
+</table></div>
+<div class="box"><strong>Mejora v1 → v2:</strong> +0.0085 Gini gracias a validación temporal robusta (3 meses vs 1), inclusión de CatBoost, y escalado correcto de iteraciones al reentrenar con 100% datos.</div>
+</section>
+
+<section>
+<h2>6. Archivos de Entrega</h2>
+<div class="scroll"><table>
+<tr><th>Archivo</th><th>Descripción</th><th>Tamaño</th></tr>
+<tr><td><strong>submission.csv</strong></td><td>Entrega principal (9,900 predicciones ordenadas)</td><td>247 KB</td></tr>
+<tr><td>resultados_validacion_DF_WCB.csv</td><td>Tabla métricas completa validación</td><td>298 B</td></tr>
+<tr><td>features_seleccionadas_DF_WCB.txt</td><td>Lista 50 features finales</td><td>1.1 KB</td></tr>
+<tr><td>Pipeline_DF_WCB.py</td><td>Pipeline final recomendado</td><td>35.5 KB</td></tr>
+</table></div>
+</section>
+
+<section>
+<h2>7. Cómo Ejecutar</h2>
+<pre><code># Instalación
+python3 -m venv .venv && source .venv/bin/activate
+pip install -U pandas numpy scikit-learn lightgbm xgboost catboost optuna
+
+# Ejecución completa (~2 min)
+python Pipeline_DF_WCB.py --datos . --salida ./salida/submission.csv --trials 30 --meses-val 3 --n-seeds 3
+
+# Ejecución rápida test (~30 seg)
+python Pipeline_DF_WCB.py --datos . --salida ./salida/prueba.csv --trials 0 --n-seeds 1
+</code></pre>
+</section>
+
+<section>
+<h2>8. Próximos Pasos Recomendados</h2>
+<div class="two">
+<div class="box"><strong>Corto plazo</strong><br>• Enviar <code>submission.csv</code> actual<br>• Probar ensemble LightGBM + CatBoost (ponderado por Gini)<br>• Experimentar <code>--meses-val 4</code></div>
+<div class="box"><strong>Mediano plazo</strong><br>• Walk-forward validation (múltiples cortes)<br>• Features interacciones (ingresos × ratio_deuda)<br>• SHAP para interpretabilidad por segmento</div>
+</div>
+</section>
+
+<section>
+<h2>9. Equipo y Trazabilidad</h2>
+<p>Pipeline desarrollado con estándares de ML Engineering: código modular, tipado, documentado, reproducible (semillas fijas), trazabilidad completa (artefactos validación + features). Listo para competencia y producción.</p>
+<p style="color:var(--mute);font-size:0.9rem;margin-top:40px;padding-top:20px;border-top:1px solid var(--line)">Informe generado 2026-10-05 • DataFest 2026 Equipo BCP</p>
+</section>
+</main>
+</body>
+</html>
