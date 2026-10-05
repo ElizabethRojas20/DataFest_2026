@@ -21,11 +21,8 @@ Decisiones de diseño para evitar data leakage
   test nunca se usa.
 * El Target Encoding de una fila del mes M se calcula únicamente con los objetivos de meses < M
   (media acumulada suavizada). Para test se usan todos los meses de train.
-* La validación es TEMPORAL (últimos N meses de train; por defecto 3 ≈ 73/27 en filas), no un
-  ``train_test_split`` aleatorio: el test es un mes futuro y un mismo cliente aparece en varios
-  meses con casi todas sus variables fijas, lo que inflaría la métrica con una partición aleatoria.
-* La selección de variables se ajusta solo con los meses de entrenamiento, de modo que la métrica
-  de validación sea una estimación honesta.
+* La selección de variables se ajusta solo con enero-octubre, de modo que la métrica en noviembre
+  sea una estimación honesta.
 * No se usan ``id_cliente`` ni ``mes`` como predictoras (diciembre es un mes no visto).
 
 Uso
@@ -111,7 +108,7 @@ class Config:
     top_k: int = 80
 
     # Modelado
-    n_meses_validacion: int = 3                 # últimos N meses de train para validar (3 ≈ 73/27 en filas)
+    mes_validacion: Optional[int] = None        # None -> último mes de train (noviembre)
     n_trials_optuna: int = 30
     n_seeds_final: int = 3
     seed: int = 42
@@ -581,15 +578,14 @@ class EvaluadorModelos:
 # =============================================================================
 def entrenar_y_predecir_final(familia: str, params: dict, mejor_iter: int,
                               X_all: pd.DataFrame, y_all: pd.Series, X_test: pd.DataFrame,
-                              n_seeds: int, seed: int, factor_datos: float = 1.1) -> np.ndarray:
+                              n_seeds: int, seed: int) -> np.ndarray:
     """
     Reentrena el modelo ganador con el 100 % de train y predice test.
 
-    * Boosting: n_iter = factor_datos * mejor_iter, donde factor_datos = filas totales / filas
-      de entrenamiento de la validación (más datos admiten algo más de árboles).
+    * Boosting: n_iter = 1.1 * mejor_iter (≈ 10 % más datos al sumar noviembre).
     * Se promedian ``n_seeds`` semillas para estabilizar el ranking.
     """
-    n_iter = max(10, int(round(mejor_iter * factor_datos)))
+    n_iter = max(10, int(round(mejor_iter * 1.1)))
     preds = []
     for i in range(n_seeds):
         m = construir_modelo(familia, params, n_iter, seed + i)
@@ -632,19 +628,12 @@ def main(cfg: Config) -> None:
     del train, test
     gc.collect()
 
-    # 2) Partición TEMPORAL (no aleatoria): validación = últimos N meses de train; entrenamiento =
-    #    meses anteriores. Imita la situación real (predecir un mes futuro) y evita que un mismo
-    #    cliente quede a ambos lados de la partición.
-    meses = np.sort(np.unique(datos.mes_train))
-    if not 1 <= cfg.n_meses_validacion < len(meses):
-        raise ValueError(f"n_meses_validacion debe estar entre 1 y {len(meses) - 1}")
-    mes_corte = int(meses[-cfg.n_meses_validacion])
-    es_val = datos.mes_train >= mes_corte
-    es_tr = ~es_val
-    factor_datos = len(datos.mes_train) / es_tr.sum()      # para escalar nº de árboles al final
-    log.info("Entrenamiento: meses %d-%d (%d filas, %.0f%%) | Validación: meses %d-%d (%d filas, %.0f%%)",
-             meses[0], meses[-cfg.n_meses_validacion - 1], es_tr.sum(), 100 * es_tr.mean(),
-             mes_corte, meses[-1], es_val.sum(), 100 * es_val.mean())
+    # 2) Partición temporal: entrenamiento = meses < mes_validacion ; validación = mes_validacion
+    mes_val = cfg.mes_validacion or int(datos.mes_train.max())
+    es_val = datos.mes_train == mes_val
+    es_tr = datos.mes_train < mes_val
+    log.info("Validación temporal: mes %d (%d filas) | entrenamiento: %d filas",
+             mes_val, es_val.sum(), es_tr.sum())
 
     # 3) Selección de variables (SOLO con el periodo de entrenamiento)
     features = seleccionar_features(datos.X_train.loc[es_tr], datos.y_train.loc[es_tr], cfg)
@@ -654,8 +643,7 @@ def main(cfg: Config) -> None:
         datos.X_train.loc[es_tr, features], datos.y_train.loc[es_tr],
         datos.X_train.loc[es_val, features], datos.y_train.loc[es_val], seed=cfg.seed)
     tabla = ev.evaluar_todos(cfg.n_trials_optuna)
-    log.info("Resultados en validación (meses %d-%d):\n%s", mes_corte, meses[-1],
-             tabla.round(4).to_string())
+    log.info("Resultados en validación (mes %d):\n%s", mes_val, tabla.round(4).to_string())
 
     # 5) Modelo ganador -> entrenamiento con el 100 % de train -> predicción de test
     ganador = tabla.index[0]
@@ -664,29 +652,26 @@ def main(cfg: Config) -> None:
     pred = entrenar_y_predecir_final(
         r["familia"], r["params"], int(r["mejor_iter"]),
         datos.X_train[features], datos.y_train, datos.X_test[features],
-        cfg.n_seeds_final, cfg.seed, factor_datos)
+        cfg.n_seeds_final, cfg.seed)
     exportar_submission(datos.id_test, pred, cfg)
 
     # Artefactos auxiliares para trazabilidad
     carpeta = cfg.ruta_salida.parent
-    tabla.to_csv(carpeta / "validation_results_DF_new.csv")
-    (carpeta / "features_seleccionadas_new.txt").write_text("\n".join(features), encoding="utf-8")
+    tabla.to_csv(carpeta / "Validation_results_DF_1.csv")
+    (carpeta / "features_seleccionadas_DF_1.txt").write_text("\n".join(features), encoding="utf-8")
     log.info("Pipeline completo en %.1f min", (time.time() - t0) / 60)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline de propensión de conversión (Gini)")
     ap.add_argument("--datos", type=Path, default=Path("."), help="carpeta con train/test/sample")
-    ap.add_argument("--salida", type=Path, default=Path("submission_DF_new.csv"))
+    ap.add_argument("--salida", type=Path, default=Path("submission_DF_1.csv"))
     ap.add_argument("--trials", type=int, default=30, help="trials de Optuna (0 = sin Optuna)")
     ap.add_argument("--top-k", type=int, default=80)
-    ap.add_argument("--meses-val", type=int, default=3,
-                    help="nº de últimos meses de train usados para validar (3 ≈ 73/27)")
     ap.add_argument("--umbral-ohe", type=int, default=10,
                     help="nunique <= umbral -> One-Hot; si no -> Target Encoding temporal")
     ap.add_argument("--n-seeds", type=int, default=3)
     ap.add_argument("--semilla", type=int, default=42)
     a = ap.parse_args()
     main(Config(ruta_datos=a.datos, ruta_salida=a.salida, n_trials_optuna=a.trials,
-                top_k=a.top_k, umbral_ohe=a.umbral_ohe, n_seeds_final=a.n_seeds, seed=a.semilla,
-                n_meses_validacion=a.meses_val))
+                top_k=a.top_k, umbral_ohe=a.umbral_ohe, n_seeds_final=a.n_seeds, seed=a.semilla))

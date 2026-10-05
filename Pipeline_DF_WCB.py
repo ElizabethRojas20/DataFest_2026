@@ -8,7 +8,7 @@ Etapas
 ------
 1. Ingeniería de características (lags, ventanas móviles, One-Hot, Target Encoding temporal).
 2. Selección de características (varianza cero -> correlación de Pearson -> top-K por LightGBM).
-3. Modelado y validación (clase ``EvaluadorModelos``: LightGBM, XGBoost, RandomForest + Optuna).
+3. Modelado y validación (clase ``EvaluadorModelos``: LightGBM, XGBoost, CatBoost, RandomForest + Optuna).
 4. Entrenamiento final con el 100 % de train y generación de ``submission.csv``.
 
 Decisiones de diseño para evitar data leakage
@@ -21,15 +21,18 @@ Decisiones de diseño para evitar data leakage
   test nunca se usa.
 * El Target Encoding de una fila del mes M se calcula únicamente con los objetivos de meses < M
   (media acumulada suavizada). Para test se usan todos los meses de train.
-* La selección de variables se ajusta solo con enero-octubre, de modo que la métrica en noviembre
-  sea una estimación honesta.
+* La validación es TEMPORAL (últimos N meses de train; por defecto 3 ≈ 73/27 en filas), no un
+  ``train_test_split`` aleatorio: el test es un mes futuro y un mismo cliente aparece en varios
+  meses con casi todas sus variables fijas, lo que inflaría la métrica con una partición aleatoria.
+* La selección de variables se ajusta solo con los meses de entrenamiento, de modo que la métrica
+  de validación sea una estimación honesta.
 * No se usan ``id_cliente`` ni ``mes`` como predictoras (diciembre es un mes no visto).
 
 Uso
 ---
     python pipeline.py --datos ./data --salida ./salida/submission.csv --trials 30
 
-Dependencias: pandas, numpy, scikit-learn, lightgbm, xgboost, optuna.
+Dependencias: pandas, numpy, scikit-learn, lightgbm, xgboost, catboost, optuna.
 """
 from __future__ import annotations
 
@@ -47,6 +50,7 @@ import numpy as np
 import optuna
 import pandas as pd
 import xgboost as xgb
+from catboost import CatBoostClassifier
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.impute import SimpleImputer
@@ -108,7 +112,7 @@ class Config:
     top_k: int = 80
 
     # Modelado
-    mes_validacion: Optional[int] = None        # None -> último mes de train (noviembre)
+    n_meses_validacion: int = 3                 # últimos N meses de train para validar (3 ≈ 73/27 en filas)
     n_trials_optuna: int = 30
     n_seeds_final: int = 3
     seed: int = 42
@@ -439,6 +443,8 @@ PARAMS_DEFECTO: Dict[str, dict] = {
                      subsample_freq=1, colsample_bytree=0.7, reg_lambda=1.0),
     "xgboost": dict(learning_rate=0.03, max_depth=6, min_child_weight=5, subsample=0.8,
                     colsample_bytree=0.7, reg_lambda=1.0),
+    "catboost": dict(learning_rate=0.05, depth=6, l2_leaf_reg=3.0, bootstrap_type="Bernoulli",
+                     subsample=0.8, rsm=0.7),
     "random_forest": dict(n_estimators=300, min_samples_leaf=20, max_features="sqrt",
                           max_samples=0.7),
 }
@@ -460,6 +466,12 @@ def construir_modelo(familia: str, params: dict, n_iter: int, seed: int, early_s
         extra = dict(early_stopping_rounds=ES_ROUNDS) if early_stopping else {}
         return xgb.XGBClassifier(**params, n_estimators=n_iter, tree_method="hist",
                                  eval_metric="auc", random_state=seed, n_jobs=-1, **extra)
+    if familia == "catboost":
+        # allow_writing_files=False evita que CatBoost cree la carpeta catboost_info/ en disco
+        extra = dict(early_stopping_rounds=ES_ROUNDS) if early_stopping else {}
+        return CatBoostClassifier(**params, iterations=n_iter, eval_metric="AUC",
+                                  random_seed=seed, thread_count=-1, verbose=False,
+                                  allow_writing_files=False, **extra)
     if familia == "random_forest":
         # RandomForest no admite NaN en todas las versiones -> imputación por mediana
         return make_pipeline(
@@ -470,8 +482,8 @@ def construir_modelo(familia: str, params: dict, n_iter: int, seed: int, early_s
 
 class EvaluadorModelos:
     """
-    Entrena y evalúa LightGBM, XGBoost y RandomForest sobre una partición temporal
-    (entrenamiento: meses previos; validación: mes siguiente) y reporta AUC y Gini.
+    Entrena y evalúa LightGBM, XGBoost, CatBoost y RandomForest sobre una partición temporal
+    (entrenamiento: meses previos; validación: últimos meses) y reporta AUC y Gini.
 
     Los modelos de boosting usan early stopping sobre el conjunto de validación; por eso el
     Gini reportado es ligeramente optimista (es el mismo criterio para todos los boosting).
@@ -520,6 +532,17 @@ class EvaluadorModelos:
         m.fit(self.X_train, self.y_train, eval_set=[(self.X_val, self.y_val)], verbose=False)
         return self._registrar(nombre, "xgboost", m, params, int(m.best_iteration) + 1)
 
+    def entrenar_catboost(self, params: Optional[dict] = None, nombre: str = "CatBoost") -> dict:
+        """
+        CatBoost con early stopping sobre AUC de validación (se conserva el mejor árbol).
+        Todas las variables ya son numéricas (One-Hot / Target Encoding previos), así que no se
+        usa el manejo nativo de categóricas de CatBoost; admite NaN sin imputar.
+        """
+        params = params or self.params["catboost"]
+        m = construir_modelo("catboost", params, ROUNDS_MAX, self.seed, early_stopping=True)
+        m.fit(self.X_train, self.y_train, eval_set=(self.X_val, self.y_val))
+        return self._registrar(nombre, "catboost", m, params, int(m.get_best_iteration()) + 1)
+
     def entrenar_random_forest(self, params: Optional[dict] = None,
                                nombre: str = "RandomForest") -> dict:
         """RandomForest con imputación por mediana (calculada solo con el set de entrenamiento)."""
@@ -556,9 +579,10 @@ class EvaluadorModelos:
 
     # ---- orquestación -------------------------------------------------------
     def evaluar_todos(self, n_trials_optuna: int = 0) -> pd.DataFrame:
-        """Entrena los tres modelos (y Optuna si n_trials_optuna > 0). Devuelve tabla ordenada."""
+        """Entrena los cuatro modelos (y Optuna si n_trials_optuna > 0). Devuelve tabla ordenada."""
         self.entrenar_lightgbm()
         self.entrenar_xgboost()
+        self.entrenar_catboost()
         self.entrenar_random_forest()
         if n_trials_optuna > 0:
             mejor = self.optimizar_lightgbm(n_trials_optuna)
@@ -578,14 +602,15 @@ class EvaluadorModelos:
 # =============================================================================
 def entrenar_y_predecir_final(familia: str, params: dict, mejor_iter: int,
                               X_all: pd.DataFrame, y_all: pd.Series, X_test: pd.DataFrame,
-                              n_seeds: int, seed: int) -> np.ndarray:
+                              n_seeds: int, seed: int, factor_datos: float = 1.1) -> np.ndarray:
     """
     Reentrena el modelo ganador con el 100 % de train y predice test.
 
-    * Boosting: n_iter = 1.1 * mejor_iter (≈ 10 % más datos al sumar noviembre).
+    * Boosting: n_iter = factor_datos * mejor_iter, donde factor_datos = filas totales / filas
+      de entrenamiento de la validación (más datos admiten algo más de árboles).
     * Se promedian ``n_seeds`` semillas para estabilizar el ranking.
     """
-    n_iter = max(10, int(round(mejor_iter * 1.1)))
+    n_iter = max(10, int(round(mejor_iter * factor_datos)))
     preds = []
     for i in range(n_seeds):
         m = construir_modelo(familia, params, n_iter, seed + i)
@@ -628,12 +653,19 @@ def main(cfg: Config) -> None:
     del train, test
     gc.collect()
 
-    # 2) Partición temporal: entrenamiento = meses < mes_validacion ; validación = mes_validacion
-    mes_val = cfg.mes_validacion or int(datos.mes_train.max())
-    es_val = datos.mes_train == mes_val
-    es_tr = datos.mes_train < mes_val
-    log.info("Validación temporal: mes %d (%d filas) | entrenamiento: %d filas",
-             mes_val, es_val.sum(), es_tr.sum())
+    # 2) Partición TEMPORAL (no aleatoria): validación = últimos N meses de train; entrenamiento =
+    #    meses anteriores. Imita la situación real (predecir un mes futuro) y evita que un mismo
+    #    cliente quede a ambos lados de la partición.
+    meses = np.sort(np.unique(datos.mes_train))
+    if not 1 <= cfg.n_meses_validacion < len(meses):
+        raise ValueError(f"n_meses_validacion debe estar entre 1 y {len(meses) - 1}")
+    mes_corte = int(meses[-cfg.n_meses_validacion])
+    es_val = datos.mes_train >= mes_corte
+    es_tr = ~es_val
+    factor_datos = len(datos.mes_train) / es_tr.sum()      # para escalar nº de árboles al final
+    log.info("Entrenamiento: meses %d-%d (%d filas, %.0f%%) | Validación: meses %d-%d (%d filas, %.0f%%)",
+             meses[0], meses[-cfg.n_meses_validacion - 1], es_tr.sum(), 100 * es_tr.mean(),
+             mes_corte, meses[-1], es_val.sum(), 100 * es_val.mean())
 
     # 3) Selección de variables (SOLO con el periodo de entrenamiento)
     features = seleccionar_features(datos.X_train.loc[es_tr], datos.y_train.loc[es_tr], cfg)
@@ -643,7 +675,8 @@ def main(cfg: Config) -> None:
         datos.X_train.loc[es_tr, features], datos.y_train.loc[es_tr],
         datos.X_train.loc[es_val, features], datos.y_train.loc[es_val], seed=cfg.seed)
     tabla = ev.evaluar_todos(cfg.n_trials_optuna)
-    log.info("Resultados en validación (mes %d):\n%s", mes_val, tabla.round(4).to_string())
+    log.info("Resultados en validación (meses %d-%d):\n%s", mes_corte, meses[-1],
+             tabla.round(4).to_string())
 
     # 5) Modelo ganador -> entrenamiento con el 100 % de train -> predicción de test
     ganador = tabla.index[0]
@@ -652,26 +685,29 @@ def main(cfg: Config) -> None:
     pred = entrenar_y_predecir_final(
         r["familia"], r["params"], int(r["mejor_iter"]),
         datos.X_train[features], datos.y_train, datos.X_test[features],
-        cfg.n_seeds_final, cfg.seed)
+        cfg.n_seeds_final, cfg.seed, factor_datos)
     exportar_submission(datos.id_test, pred, cfg)
 
     # Artefactos auxiliares para trazabilidad
     carpeta = cfg.ruta_salida.parent
-    tabla.to_csv(carpeta / "Validation_results.csv")
-    (carpeta / "features_seleccionadas.txt").write_text("\n".join(features), encoding="utf-8")
+    tabla.to_csv(carpeta / "resultados_validacion_DF_WCB.csv")
+    (carpeta / "features_seleccionadas_DF_WCB.txt").write_text("\n".join(features), encoding="utf-8")
     log.info("Pipeline completo en %.1f min", (time.time() - t0) / 60)
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser(description="Pipeline de propensión de conversión (Gini)")
     ap.add_argument("--datos", type=Path, default=Path("."), help="carpeta con train/test/sample")
-    ap.add_argument("--salida", type=Path, default=Path("submission.csv"))
+    ap.add_argument("--salida", type=Path, default=Path("submission_DF_WCB.csv"))
     ap.add_argument("--trials", type=int, default=30, help="trials de Optuna (0 = sin Optuna)")
     ap.add_argument("--top-k", type=int, default=80)
+    ap.add_argument("--meses-val", type=int, default=3,
+                    help="nº de últimos meses de train usados para validar (3 ≈ 73/27)")
     ap.add_argument("--umbral-ohe", type=int, default=10,
                     help="nunique <= umbral -> One-Hot; si no -> Target Encoding temporal")
     ap.add_argument("--n-seeds", type=int, default=3)
     ap.add_argument("--semilla", type=int, default=42)
     a = ap.parse_args()
     main(Config(ruta_datos=a.datos, ruta_salida=a.salida, n_trials_optuna=a.trials,
-                top_k=a.top_k, umbral_ohe=a.umbral_ohe, n_seeds_final=a.n_seeds, seed=a.semilla))
+                top_k=a.top_k, umbral_ohe=a.umbral_ohe, n_seeds_final=a.n_seeds, seed=a.semilla,
+                n_meses_validacion=a.meses_val))

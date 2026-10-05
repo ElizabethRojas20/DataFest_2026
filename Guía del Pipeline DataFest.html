@@ -1,0 +1,793 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Guía del Pipeline DataFest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap">
+<style>
+/* Concepto: documento de estudio, como un manual impreso. Columna de lectura única, cada sección lleva
+   el número que tiene en el código (# 0 ... # 6). Acento azul para ideas clave, ámbar para cuidados,
+   verde para analogías. */
+:root {
+  --bg: #f5f7fa;
+  --surface: #ffffff;
+  --ink: #1a2230;
+  --muted: #566274;
+  --line: #d7dde6;
+  --accent: #1f5fa8;
+  --accent-soft: #e5eefa;
+  --warn: #8a5300;
+  --warn-soft: #fbf0d9;
+  --good: #17694f;
+  --good-soft: #dff2ea;
+  --code-bg: #edf0f5;
+  --code-ink: #22304a;
+  --code-comment: #62708a;
+  --font-head: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10151d; --surface: #171e29; --ink: #e5eaf1; --muted: #98a5b7; --line: #2a3443;
+    --accent: #77b0f0; --accent-soft: #172538; --warn: #e6b862; --warn-soft: #2a2112;
+    --good: #58c8a3; --good-soft: #10271f; --code-bg: #0d1219; --code-ink: #cfd9ea; --code-comment: #7d8ba3;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10151d; --surface: #171e29; --ink: #e5eaf1; --muted: #98a5b7; --line: #2a3443;
+  --accent: #77b0f0; --accent-soft: #172538; --warn: #e6b862; --warn-soft: #2a2112;
+  --good: #58c8a3; --good-soft: #10271f; --code-bg: #0d1219; --code-ink: #cfd9ea; --code-comment: #7d8ba3;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 18px; line-height: 1.65;
+  padding-inline: 16px; padding-block: 0 72px;
+}
+.page { max-width: 780px; margin-inline: auto; }
+h1, h2, h3, h4, .eyebrow, th, .label, nav a, .tag { font-family: var(--font-head); }
+h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.1; font-weight: 600; margin: 0 0 12px; text-wrap: balance; letter-spacing: -0.01em; }
+h2 { font-size: clamp(1.55rem, 4vw, 2rem); line-height: 1.2; font-weight: 600; margin: 0 0 14px; text-wrap: balance; }
+h3 { font-size: 1.2rem; line-height: 1.3; font-weight: 600; margin: 34px 0 8px; text-wrap: balance; }
+h4 { font-size: 1rem; font-weight: 600; margin: 22px 0 4px; }
+p { margin: 0 0 14px; }
+ul, ol { margin: 0 0 14px; padding-left: 1.3em; }
+li { margin-bottom: 6px; }
+a { color: var(--accent); }
+strong { font-weight: 600; }
+code { font-family: var(--font-mono); font-size: 0.82em; background: var(--code-bg); color: var(--code-ink); padding: 1px 5px; border-radius: 4px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); color: var(--code-ink); border-radius: 8px; padding: 14px 16px; margin: 0 0 16px; overflow-x: auto; border: 1px solid var(--line); }
+pre code { background: none; padding: 0; font-size: 13.5px; line-height: 1.55; overflow-wrap: normal; }
+.c { color: var(--code-comment); }
+.eyebrow { font-size: 12.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); font-weight: 600; margin: 0 0 6px; }
+.lead { font-size: 1.12em; color: var(--muted); }
+.cover { padding-block: 56px 36px; border-bottom: 2px solid var(--ink); margin-bottom: 8px; }
+.cover .meta { font-family: var(--font-head); font-size: 14px; color: var(--muted); margin-top: 16px; }
+.index { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 6px 24px; padding: 0; margin: 24px 0 0; list-style: none; }
+.index li { margin: 0; }
+.index a { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; text-decoration: none; color: var(--ink); border-bottom: 1px solid var(--line); font-family: var(--font-head); font-size: 15px; }
+.index a:hover { color: var(--accent); }
+.index .n { color: var(--accent); font-weight: 600; min-width: 2.2em; font-variant-numeric: tabular-nums; }
+section.sec { padding-block: 44px 8px; border-bottom: 1px solid var(--line); scroll-margin-top: 12px; }
+section.sec:last-of-type { border-bottom: 0; }
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 18px 0; }
+.callout > :last-child { margin-bottom: 0; }
+.callout .label { display: block; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 600; margin-bottom: 2px; color: var(--accent); }
+.callout.warn { border-left-color: var(--warn); background: var(--warn-soft); }
+.callout.warn .label { color: var(--warn); }
+.callout.anal { border-left-color: var(--good); background: var(--good-soft); }
+.callout.anal .label { color: var(--good); }
+.tablewrap { overflow-x: auto; margin: 0 0 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 15px; line-height: 1.45; }
+th, td { text-align: left; padding: 9px 12px; vertical-align: top; border-bottom: 1px solid var(--line); }
+th { font-size: 12.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; background: var(--code-bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--accent-soft); color: var(--accent); white-space: nowrap; }
+dl.gloss { margin: 0; }
+dl.gloss dt { font-family: var(--font-head); font-weight: 600; margin-top: 14px; }
+dl.gloss dd { margin: 2px 0 0; }
+figure { margin: 22px 0; }
+figcaption { font-family: var(--font-head); font-size: 14px; color: var(--muted); margin-top: 6px; }
+.flow { display: flex; flex-wrap: wrap; gap: 8px; align-items: stretch; margin: 20px 0; padding: 0; list-style: none; }
+.flow li { flex: 1 1 120px; min-width: 0; margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-family: var(--font-head); font-size: 14px; line-height: 1.35; position: relative; }
+.flow li b { display: block; color: var(--accent); font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 2px; }
+.funnel { margin: 20px 0; }
+.funnel .row { display: grid; grid-template-columns: 1fr; gap: 4px; margin-bottom: 12px; font-family: var(--font-head); font-size: 14px; }
+.funnel .bar { height: 30px; border-radius: 6px; background: var(--accent); color: #fff; display: flex; align-items: center; padding-inline: 10px; font-weight: 600; min-width: 64px; font-variant-numeric: tabular-nums; }
+.funnel .what { color: var(--muted); }
+.hbars { margin: 18px 0 8px; }
+.hbar { display: grid; grid-template-columns: 150px 1fr; gap: 10px; align-items: center; margin-bottom: 10px; font-family: var(--font-head); font-size: 14px; }
+.hbar .track { background: var(--code-bg); border-radius: 6px; height: 28px; position: relative; }
+.hbar .fill { background: var(--accent); height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+.hbar.win .fill { background: var(--good); }
+@media (max-width: 520px) { .hbar { grid-template-columns: 1fr; gap: 4px; } }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin: 18px 0; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+.card h4 { margin-top: 0; }
+.card > :last-child { margin-bottom: 0; }
+.chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0; font-family: var(--font-head); font-size: 13px; }
+.chip { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px; }
+.chip.fix { border-color: var(--accent); color: var(--accent); }
+.arrow { color: var(--muted); }
+.slider { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin: 18px 0; font-family: var(--font-head); }
+.slider label { font-size: 14px; color: var(--muted); display: block; margin-bottom: 6px; }
+.slider input[type=range] { width: 100%; accent-color: var(--accent); }
+.slider .out { display: flex; flex-wrap: wrap; gap: 8px 28px; margin-top: 10px; align-items: baseline; }
+.slider .big { font-size: 1.7rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.slider .small { font-size: 13px; color: var(--muted); }
+.slider p { font-size: 14.5px; margin: 10px 0 0; color: var(--ink); font-family: var(--font-body); }
+svg text { font-family: var(--font-head); }
+.chart-bar { fill: var(--accent); }
+.chart-ax { stroke: var(--line); stroke-width: 1; }
+.chart-t { fill: var(--muted); font-size: 12px; }
+.chart-v { fill: var(--ink); font-size: 12px; font-weight: 600; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media print {
+  body { background: #fff; color: #000; font-size: 11.5pt; padding: 0; }
+  :root { --bg:#fff; --surface:#fff; --ink:#000; --muted:#444; --line:#bbb; --code-bg:#f1f1f1; --code-ink:#111; --accent-soft:#eef3fa; }
+  section.sec { break-before: page; }
+  .cover { break-after: avoid; }
+  pre, .callout, .tablewrap, figure, .card { break-inside: avoid; }
+  .slider { display: none; }
+}
+</style>
+
+<div class="page">
+
+<header class="cover">
+  <p class="eyebrow">Competencia DataFest 2026 · Propensión de conversión</p>
+  <h1>Guía del Pipeline DataFest</h1>
+  <p class="lead">Qué hace cada parte del código y por qué, explicado desde cero. No hace falta saber programar ni estadística para seguirla.</p>
+  <p class="meta">Basada en <code>pipeline.py</code> (713 líneas, 7 secciones) · Métrica de la competencia: Gini · Modelos comparados: LightGBM, XGBoost, CatBoost y RandomForest</p>
+  <ul class="index">
+    <li><a href="#intro"><span class="n">A</span>Antes de empezar</a></li>
+    <li><a href="#datos"><span class="n">B</span>Los datos</a></li>
+    <li><a href="#mapa"><span class="n">C</span>Mapa del código</a></li>
+    <li><a href="#s0"><span class="n">0</span>Configuración</a></li>
+    <li><a href="#s1"><span class="n">1</span>Carga y validación</a></li>
+    <li><a href="#s2"><span class="n">2</span>Crear variables</a></li>
+    <li><a href="#s3"><span class="n">3</span>Selección de variables</a></li>
+    <li><a href="#s4"><span class="n">4</span>Modelado y validación</a></li>
+    <li><a href="#s5"><span class="n">5</span>Entrenamiento final y entrega</a></li>
+    <li><a href="#s6"><span class="n">6</span>El programa principal</a></li>
+    <li><a href="#modelos"><span class="n">M</span>Los modelos, uno por uno</a></li>
+    <li><a href="#glosario"><span class="n">G</span>Glosario</a></li>
+  </ul>
+</header>
+
+<!-- ===================================================== A -->
+<section class="sec" id="intro">
+  <p class="eyebrow">Parte A</p>
+  <h2>Antes de empezar</h2>
+
+  <h3>El problema en una frase</h3>
+  <p>Hay una lista de clientes de un banco, observados mes a mes. Para cada cliente en <strong>diciembre de 2026</strong> hay que dar un número entre 0 y 1: qué tan probable es que ese cliente haga su <strong>primera conversión</strong> en ese mes. Un número cercano a 1 significa "muy probable"; cercano a 0, "muy improbable".</p>
+  <p>No se pide adivinar sí o no. Se pide ordenar a los clientes de más a menos propensos. Por eso la competencia usa una métrica de orden y no de aciertos.</p>
+
+  <h3>Cómo aprende una máquina</h3>
+  <p>Se le entrega una tabla de ejemplos pasados donde ya se conoce la respuesta (<code>train.csv</code>, enero a noviembre). La máquina busca patrones entre las características de cada cliente y el resultado. Después se le entrega una tabla nueva donde la respuesta está oculta (<code>test.csv</code>, diciembre) y pide el número para cada fila. Esa herramienta que aprende los patrones se llama <strong>modelo</strong>.</p>
+
+  <h3>La métrica: AUC y Gini</h3>
+  <div class="callout anal">
+    <span class="label">Analogía</span>
+    <p>Elige al azar un cliente que sí convirtió y otro que no. El <strong>AUC</strong> es la probabilidad de que el modelo le haya dado un puntaje más alto al que sí convirtió. Si adivina al azar, acierta la mitad de las veces (AUC = 0,5). Si ordena perfecto, siempre (AUC = 1).</p>
+  </div>
+  <p>El <strong>Gini</strong> es el mismo dato reescrito para que el azar valga 0: <code>Gini = 2 × AUC − 1</code>. Mueve el control para ver la relación.</p>
+
+  <div class="slider">
+    <label for="auc">AUC del modelo</label>
+    <input type="range" id="auc" min="0.5" max="1" step="0.005" value="0.625">
+    <div class="out">
+      <div><div class="big" id="aucv">0,625</div><div class="small">AUC</div></div>
+      <div><div class="big" id="ginv">0,250</div><div class="small">Gini = 2 × AUC − 1</div></div>
+    </div>
+    <p id="aucmsg"></p>
+  </div>
+
+  <p>Nuestros modelos están alrededor de un Gini de 0,25, es decir un AUC de 0,625. Es mejor que el azar, pero lejos de ser perfecto. Los datos tienen poca señal, y el código no puede inventar la que no hay.</p>
+
+  <h3>Palabras que se repiten</h3>
+  <dl class="gloss">
+    <dt>Variable (o característica, o feature)</dt>
+    <dd>Una columna de la tabla que describe al cliente: edad, ingresos, saldo promedio, región.</dd>
+    <dt>Objetivo (o target)</dt>
+    <dd>La columna <code>objetivo</code>: 1 si el cliente convirtió ese mes, 0 si no. Es lo que se quiere predecir.</dd>
+    <dt>Entrenamiento, validación y test</dt>
+    <dd>Entrenamiento: datos con respuesta que el modelo usa para aprender. Validación: datos con respuesta que se separan para comprobar qué tan bien aprendió. Test: datos sin respuesta, los de la competencia.</dd>
+    <dt>Fuga de datos (data leakage)</dt>
+    <dd>Cuando, sin querer, el modelo ve información que no tendría en la vida real. Hace que las pruebas den resultados espectaculares y que luego el rendimiento real sea malo. Casi todo el cuidado del código existe para evitarla.</dd>
+    <dt>Sobreajuste (overfitting)</dt>
+    <dd>Cuando el modelo memoriza los ejemplos de entrenamiento, incluido su ruido, y falla con datos nuevos.</dd>
+  </dl>
+
+  <h3>Cuatro palabras de Python que vas a ver</h3>
+  <dl class="gloss">
+    <dt><code>def nombre(...)</code></dt>
+    <dd>Define una <strong>función</strong>: una receta con nombre que recibe datos y devuelve un resultado.</dd>
+    <dt><code>class Nombre</code></dt>
+    <dd>Define una <strong>clase</strong>: un molde para crear objetos que guardan datos y tienen funciones propias (llamadas métodos).</dd>
+    <dt><code>DataFrame</code> (<code>df</code>, <code>X</code>)</dt>
+    <dd>Una tabla con filas y columnas, como una hoja de Excel dentro del programa. Es el tipo de dato de la librería pandas.</dd>
+    <dt><code>cfg.algo</code></dt>
+    <dd>Un valor guardado en la configuración (Sección 0). El punto significa "dentro de".</dd>
+  </dl>
+</section>
+
+<!-- ===================================================== B -->
+<section class="sec" id="datos">
+  <p class="eyebrow">Parte B</p>
+  <h2>Los datos</h2>
+  <p>La competencia entrega cuatro archivos. Cada fila de <code>train.csv</code> y <code>test.csv</code> es un cliente en un mes concreto.</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Archivo</th><th>Qué contiene</th><th class="num">Filas</th></tr></thead>
+    <tbody>
+      <tr><td><code>train.csv</code></td><td>Enero a noviembre de 2026, con la columna <code>objetivo</code></td><td class="num">110.100</td></tr>
+      <tr><td><code>test.csv</code></td><td>Diciembre de 2026, sin <code>objetivo</code></td><td class="num">9.900</td></tr>
+      <tr><td><code>sample_submission.csv</code></td><td>Ejemplo del formato de entrega: <code>id_cliente,prediccion</code></td><td class="num">9.900</td></tr>
+      <tr><td><code>metaData.csv</code></td><td>Descripción de cada columna</td><td class="num">—</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Las columnas</h3>
+  <div class="two">
+    <div class="card"><h4>12 numéricas</h4><p><code>edad</code>, <code>ingresos</code>, <code>ratio_deuda_ingresos</code>, <code>antiguedad_cuenta_meses</code>, <code>numero_productos</code>, <code>saldo_promedio</code>, <code>dias_ultima_transaccion</code>, <code>antiguedad_direccion_meses</code>, <code>visitas_web_ultimos_90_dias</code>, <code>distancia_sucursal_km</code>, <code>dia_preferido_pago</code>, <code>dias_ultima_interaccion</code></p></div>
+    <div class="card"><h4>5 de sí o no</h4><p><code>tiene_tarjeta_credito</code>, <code>activo_movil</code>, <code>es_nuevo_cliente</code>, <code>tiene_prestamo</code>, <code>tiene_seguro</code></p></div>
+    <div class="card"><h4>5 de texto (categorías)</h4><p><code>ocupacion</code> (5 valores), <code>region</code> (5), <code>canal_adquisicion</code> (5), <code>banda_riesgo</code> (3), <code>dispositivo_principal</code> (4)</p></div>
+    <div class="card"><h4>3 especiales</h4><p><code>id_cliente</code> identifica al cliente, <code>mes</code> está en formato AAAAMM (por ejemplo 202611) y <code>objetivo</code> es la respuesta.</p></div>
+  </div>
+
+  <h3>Lo que se descubrió al revisar los datos</h3>
+  <ul>
+    <li>Hay <strong>24.628 clientes distintos</strong> en train. Un cliente aparece 4,5 veces en promedio (entre 1 y 11).</li>
+    <li>Cerca del <strong>15 %</strong> de las filas son conversiones, y ese porcentaje es muy estable de un mes a otro.</li>
+    <li>Un cliente que convierte <strong>no vuelve a aparecer</strong> en meses posteriores (se comprobó: 0 filas después de la conversión).</li>
+    <li>El <strong>81 %</strong> de los clientes de diciembre ya tenía historial en train.</li>
+    <li>De todas las variables, <strong>solo <code>dias_ultima_interaccion</code> cambia de un mes a otro</strong> para un mismo cliente (en el 80 % de los que aparecen más de una vez). Las demás son fijas.</li>
+  </ul>
+
+  <figure>
+    <svg viewBox="0 0 680 230" role="img" aria-label="Porcentaje de conversión por mes, de enero a noviembre de 2026, entre 14,1 y 15,7 por ciento" width="100%">
+      <line class="chart-ax" x1="30" y1="180" x2="660" y2="180"/>
+      <line class="chart-ax" x1="30" y1="105" x2="660" y2="105" stroke-dasharray="3 4"/>
+      <line class="chart-ax" x1="30" y1="30" x2="660" y2="30" stroke-dasharray="3 4"/>
+      <text class="chart-t" x="26" y="184" text-anchor="end">0 %</text>
+      <text class="chart-t" x="26" y="109" text-anchor="end">10 %</text>
+      <text class="chart-t" x="26" y="34" text-anchor="end">20 %</text>
+      <g>
+        <rect class="chart-bar" x="42" y="70.5" width="38" height="109.5" rx="3"/><text class="chart-v" x="61" y="64" text-anchor="middle">14,6</text><text class="chart-t" x="61" y="198" text-anchor="middle">Ene</text>
+        <rect class="chart-bar" x="100" y="62.2" width="38" height="117.8" rx="3"/><text class="chart-v" x="119" y="56" text-anchor="middle">15,7</text><text class="chart-t" x="119" y="198" text-anchor="middle">Feb</text>
+        <rect class="chart-bar" x="158" y="69" width="38" height="111" rx="3"/><text class="chart-v" x="177" y="63" text-anchor="middle">14,8</text><text class="chart-t" x="177" y="198" text-anchor="middle">Mar</text>
+        <rect class="chart-bar" x="216" y="65.2" width="38" height="114.8" rx="3"/><text class="chart-v" x="235" y="59" text-anchor="middle">15,3</text><text class="chart-t" x="235" y="198" text-anchor="middle">Abr</text>
+        <rect class="chart-bar" x="274" y="62.2" width="38" height="117.8" rx="3"/><text class="chart-v" x="293" y="56" text-anchor="middle">15,7</text><text class="chart-t" x="293" y="198" text-anchor="middle">May</text>
+        <rect class="chart-bar" x="332" y="63.7" width="38" height="116.3" rx="3"/><text class="chart-v" x="351" y="57" text-anchor="middle">15,5</text><text class="chart-t" x="351" y="198" text-anchor="middle">Jun</text>
+        <rect class="chart-bar" x="390" y="71.2" width="38" height="108.8" rx="3"/><text class="chart-v" x="409" y="65" text-anchor="middle">14,5</text><text class="chart-t" x="409" y="198" text-anchor="middle">Jul</text>
+        <rect class="chart-bar" x="448" y="72" width="38" height="108" rx="3"/><text class="chart-v" x="467" y="66" text-anchor="middle">14,4</text><text class="chart-t" x="467" y="198" text-anchor="middle">Ago</text>
+        <rect class="chart-bar" x="506" y="74.2" width="38" height="105.8" rx="3"/><text class="chart-v" x="525" y="68" text-anchor="middle">14,1</text><text class="chart-t" x="525" y="198" text-anchor="middle">Sep</text>
+        <rect class="chart-bar" x="564" y="62.2" width="38" height="117.8" rx="3"/><text class="chart-v" x="583" y="56" text-anchor="middle">15,7</text><text class="chart-t" x="583" y="198" text-anchor="middle">Oct</text>
+        <rect class="chart-bar" x="622" y="66.7" width="38" height="113.3" rx="3"/><text class="chart-v" x="641" y="60" text-anchor="middle">15,1</text><text class="chart-t" x="641" y="198" text-anchor="middle">Nov</text>
+      </g>
+    </svg>
+    <figcaption>Porcentaje de filas con <code>objetivo = 1</code> en cada mes de train. Casi no se mueve.</figcaption>
+  </figure>
+
+  <div class="callout warn">
+    <span class="label">Cuidado</span>
+    <p>Que casi todas las variables sean fijas por cliente tiene una consecuencia importante: gran parte de las variables históricas que crea el código (rezagos, promedios móviles) son copias del valor actual y no aportan información nueva. El código las detecta y las descarta en la Sección 3.</p>
+  </div>
+</section>
+
+<!-- ===================================================== C -->
+<section class="sec" id="mapa">
+  <p class="eyebrow">Parte C</p>
+  <h2>Mapa del código</h2>
+  <p>El programa es una cadena de pasos. La salida de cada uno es la entrada del siguiente:</p>
+
+  <ol class="flow">
+    <li><b>Entrada</b>train.csv y test.csv</li>
+    <li><b>Sección 1</b>Cargar y comprobar</li>
+    <li><b>Sección 2</b>Crear variables nuevas</li>
+    <li><b>Sección 3</b>Quedarse con las útiles</li>
+    <li><b>Sección 4</b>Comparar modelos</li>
+    <li><b>Sección 5</b>Reentrenar y predecir</li>
+    <li><b>Salida</b>submission.csv</li>
+  </ol>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Sección</th><th>Para qué sirve</th><th>Lo principal que contiene</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag">0</span> Configuración</td><td>Reúne todos los ajustes en un solo lugar</td><td><code>Config</code></td></tr>
+      <tr><td><span class="tag">1</span> Carga y validación</td><td>Leer los archivos y comprobar que están bien</td><td><code>cargar_datos</code>, <code>validar_esquema</code>, <code>diagnostico_inicial</code></td></tr>
+      <tr><td><span class="tag">2</span> Variables</td><td>Crear información nueva a partir del historial</td><td><code>crear_features_temporales</code>, <code>target_encoding_temporal</code>, <code>construir_dataset</code></td></tr>
+      <tr><td><span class="tag">3</span> Selección</td><td>Descartar variables que sobran</td><td><code>SelectorVarianzaCero</code>, <code>SelectorCorrelacion</code>, <code>SelectorImportanciaLGBM</code></td></tr>
+      <tr><td><span class="tag">4</span> Modelado</td><td>Entrenar varios modelos y medir cuál ordena mejor</td><td><code>EvaluadorModelos</code>, <code>construir_modelo</code></td></tr>
+      <tr><td><span class="tag">5</span> Entrega</td><td>Entrenar el ganador con todo y generar el archivo final</td><td><code>entrenar_y_predecir_final</code>, <code>exportar_submission</code></td></tr>
+      <tr><td><span class="tag">6</span> Principal</td><td>Ejecutar todo en orden</td><td><code>main</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ===================================================== 0 -->
+<section class="sec" id="s0">
+  <p class="eyebrow">Sección 0 del código</p>
+  <h2>Configuración</h2>
+  <p>Aquí está <code>Config</code>, una "hoja de ajustes". Cada número que podría querer cambiarse (cuántos meses se validan, cuántas variables se conservan, cuántas pruebas hace Optuna) vive en este lugar y no repartido por el programa. Si quieres cambiar el comportamiento, casi siempre se edita aquí o se usa un argumento al ejecutar.</p>
+
+<pre><code>lags: Tuple[int, ...] = (1, 2, 3)     <span class="c"># rezagos: 1, 2 y 3 meses atrás</span>
+ventana: int = 3                      <span class="c"># ventana móvil de 3 meses</span>
+umbral_ohe: int = 10                  <span class="c"># hasta 10 categorías: One-Hot; más: Target Encoding</span>
+suavizado_te: float = 50.0            <span class="c"># fuerza del suavizado del Target Encoding</span>
+corr_umbral: float = 0.95             <span class="c"># correlación máxima permitida entre variables</span>
+top_k: int = 80                       <span class="c"># máximo de variables a conservar</span>
+n_meses_validacion: int = 3           <span class="c"># meses finales de train que se usan para validar</span>
+n_trials_optuna: int = 30             <span class="c"># pruebas del buscador de hiperparámetros</span>
+n_seeds_final: int = 3                <span class="c"># semillas que se promedian al final</span>
+seed: int = 42                        <span class="c"># semilla base, para repetir resultados</span></code></pre>
+
+  <div class="callout anal">
+    <span class="label">Analogía</span>
+    <p>Es el panel de una lavadora: la máquina hace todo sola, pero antes eliges temperatura, centrifugado y duración. <code>Config</code> son esos botones.</p>
+  </div>
+
+  <p>También guarda los <strong>nombres de las columnas</strong> exactamente como los describe el archivo de documentación: qué columnas son numéricas, cuáles de sí o no, cuáles de texto, y sobre cuáles se calculan rezagos y promedios móviles. El código no usa ninguna columna que no esté descrita en esos documentos.</p>
+
+  <h4>¿Qué es la "semilla"?</h4>
+  <p>Muchos pasos usan azar (qué filas se muestrean, cómo empieza a construir árboles el modelo). La semilla fija ese azar para que, si ejecutas el programa dos veces, obtengas el mismo resultado.</p>
+</section>
+
+<!-- ===================================================== 1 -->
+<section class="sec" id="s1">
+  <p class="eyebrow">Sección 1 del código</p>
+  <h2>Carga, validación y diagnóstico</h2>
+  <p>Antes de construir nada se lee la información y se comprueba que sea la esperada. Son cuatro funciones pequeñas.</p>
+
+  <h3><code>optimizar_memoria</code></h3>
+  <p>Por defecto, pandas guarda cada número con mucho espacio, aunque sea un 7. Esta función le pide a cada columna que use el tamaño mínimo que le alcance: los enteros se encogen y los decimales pasan a <code>float32</code> (precisión más que suficiente aquí). Con los datos de la competencia, train ocupa 34,5 MB en memoria.</p>
+<pre><code>for c in df.select_dtypes(include="integer").columns:
+    df[c] = pd.to_numeric(df[c], downcast="integer")
+for c in df.select_dtypes(include="floating").columns:
+    df[c] = df[c].astype("float32")</code></pre>
+  <p>Con 110 mil filas no sería imprescindible, pero el mismo código sirve para tablas veinte veces más grandes sin quedarse sin memoria RAM.</p>
+
+  <h3><code>cargar_datos</code></h3>
+  <p>Lee <code>train.csv</code> y <code>test.csv</code> con <code>pd.read_csv</code>, les aplica la optimización anterior y avisa en pantalla de cuántas filas y columnas llegaron.</p>
+
+  <h3><code>validar_esquema</code></h3>
+  <p>Es el control de calidad. Detiene el programa con un mensaje claro si:</p>
+  <ul>
+    <li>falta alguna columna de las que describe la documentación,</li>
+    <li>hay filas repetidas para el mismo cliente en el mismo mes (el cálculo de rezagos supone que no las hay),</li>
+    <li>la lista de rezagos no incluye el rezago 1.</li>
+  </ul>
+  <p>Si encuentra celdas vacías no se detiene, solo avisa, porque la documentación dice que no debería haber ninguna.</p>
+
+  <h3><code>diagnostico_inicial</code></h3>
+  <p>No modifica nada. Solo imprime hechos que ayudan a entender el problema: la tasa de conversión de cada mes, cuántas filas aparecen después de que el cliente ya convirtió (debe ser 0), qué porcentaje de los clientes de test tiene historial en train (81 %) y cuántas categorías tiene cada variable de texto. Es el equivalente a mirar los datos antes de decidir qué hacer con ellos.</p>
+</section>
+
+<!-- ===================================================== 2 -->
+<section class="sec" id="s2">
+  <p class="eyebrow">Sección 2 del código</p>
+  <h2>Ingeniería de características</h2>
+  <p>"Ingeniería de características" significa <strong>crear variables nuevas</strong> que le den al modelo pistas que la tabla original no muestra de forma directa. La idea principal es usar el historial: no solo cómo está un cliente este mes, sino cómo venía los meses anteriores.</p>
+
+  <h3><code>preparar_base</code>: juntar y ordenar</h3>
+  <p>Une train y test en una sola tabla y la ordena por cliente y por mes. Se juntan para que diciembre (test) pueda "mirar atrás" a noviembre y a meses anteriores del mismo cliente. Esto no es trampa, porque las variables de noviembre se conocen en diciembre. La columna <code>objetivo</code> de test se rellena con vacío y <strong>nunca se usa</strong>.</p>
+<pre><code>df = pd.concat([tr, te], ignore_index=True)
+df = df.sort_values([cfg.id_col, cfg.mes_col], kind="mergesort").reset_index(drop=True)
+df["_mes_idx"] = (df[cfg.mes_col] // 100) * 12 + (df[cfg.mes_col] % 100)</code></pre>
+  <p>Se añaden tres columnas auxiliares que empiezan con guion bajo:</p>
+  <ul>
+    <li><code>_es_test</code>: marca las filas de diciembre.</li>
+    <li><code>_orden_test</code>: la posición original de cada fila de test, para devolver las predicciones en el mismo orden al final.</li>
+    <li><code>_mes_idx</code>: convierte el mes en un número corrido. 202611 pasa a 2026 × 12 + 11 = 24323 y 202612 pasa a 24324. Así restar dos meses da la distancia real, también entre diciembre y enero (202701 es 24325).</li>
+  </ul>
+
+  <h3><code>crear_features_temporales</code>: rezagos y ventanas</h3>
+  <p>Este es el corazón de la sección. Crea cuatro tipos de variables nuevas:</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Tipo</th><th>Nombre de ejemplo</th><th>Qué significa</th></tr></thead>
+    <tbody>
+      <tr><td>Rezago</td><td><code>saldo_promedio_lag2</code></td><td>El valor que tenía el cliente hace 2 meses</td></tr>
+      <tr><td>Cambio</td><td><code>saldo_promedio_delta1</code></td><td>Valor actual menos el del mes anterior</td></tr>
+      <tr><td>Promedio móvil</td><td><code>saldo_promedio_roll3_mean</code></td><td>Promedio de los últimos 3 meses, contando el actual</td></tr>
+      <tr><td>Suma móvil</td><td><code>saldo_promedio_roll3_sum</code></td><td>Suma de los últimos 3 meses, contando el actual</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Los rezagos (1, 2 y 3 meses) y los cambios se calculan para 7 variables: <code>saldo_promedio</code>, <code>ingresos</code>, <code>dias_ultima_transaccion</code>, <code>ratio_deuda_ingresos</code>, <code>numero_productos</code>, <code>visitas_web_ultimos_90_dias</code> y <code>dias_ultima_interaccion</code>. Los promedios y sumas móviles se calculan para 5 de ellas. En total son 39 columnas nuevas, más una llamada <code>meses_en_ventana3</code> que dice cuántos de esos 3 meses existen realmente.</p>
+
+  <h4>El detalle que lo hace correcto: los rezagos respetan el calendario</h4>
+  <p>Un cliente no aparece todos los meses. Si se tomara simplemente "la fila anterior", un rezago de 1 mes podría traer el valor de hace 3 meses sin que nadie se dé cuenta. El código comprueba que la fila anterior sea <strong>exactamente</strong> el mes esperado; si no lo es, deja el valor vacío.</p>
+
+  <figure>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Cliente</th><th>Mes</th><th class="num">dias_ultima_interaccion</th><th class="num">…_lag1</th><th class="num">…_lag2</th></tr></thead>
+      <tbody>
+        <tr><td>7</td><td>202601</td><td class="num">40</td><td class="num">vacío</td><td class="num">vacío</td></tr>
+        <tr><td>7</td><td>202602</td><td class="num">35</td><td class="num">40</td><td class="num">vacío</td></tr>
+        <tr><td>7</td><td>202604</td><td class="num">12</td><td class="num">vacío</td><td class="num">35</td></tr>
+      </tbody>
+    </table></div>
+    <figcaption>Ejemplo ilustrativo con números inventados para explicar la regla. En abril no hay marzo, así que el rezago 1 queda vacío. El rezago 2 sí encuentra febrero.</figcaption>
+  </figure>
+
+<pre><code><span class="c"># ¿la fila k posiciones atrás es exactamente k meses antes?</span>
+mascara = (df["_mes_idx"] - grupo_mes.shift(k)) == k
+lag = np.where(mascara, valor_k_filas_atras, np.nan)</code></pre>
+
+  <div class="callout warn">
+    <span class="label">Cuidado</span>
+    <p>Todas estas variables miran <strong>solo hacia atrás</strong>. Nunca se usa información de meses posteriores, porque en la vida real no existe cuando se hace la predicción. Eso es evitar la fuga de datos.</p>
+  </div>
+
+  <h3><code>target_encoding_temporal</code>: convertir texto en números sin hacer trampa</h3>
+  <p>Los modelos solo entienden números, así que las variables de texto hay que convertirlas. Hay dos técnicas, y el código elige según cuántas categorías tenga cada variable (el umbral es <code>umbral_ohe = 10</code>):</p>
+  <div class="two">
+    <div class="card">
+      <h4>One-Hot Encoding (pocas categorías)</h4>
+      <p>Crea una columna de 0 y 1 por categoría. <code>banda_riesgo</code> se convierte en <code>banda_riesgo_low</code>, <code>banda_riesgo_medium</code> y <code>banda_riesgo_high</code>; un cliente de riesgo medio tendrá 0, 1, 0.</p>
+    </div>
+    <div class="card">
+      <h4>Target Encoding (muchas categorías)</h4>
+      <p>Reemplaza cada categoría por la tasa de conversión histórica de esa categoría. Sirve cuando hay cientos de valores y crear una columna por cada uno sería inmanejable.</p>
+    </div>
+  </div>
+
+  <p>El Target Encoding tiene un riesgo enorme de fuga: si la tasa de una categoría se calcula con todos los datos, incluida la fila que se está describiendo, el modelo "ve" la respuesta. Por eso aquí se calcula con corte temporal: <strong>para una fila del mes M solo se usan los resultados de meses anteriores a M</strong>.</p>
+
+<pre><code><span class="c"># fórmula (m = suavizado_te = 50)</span>
+TE = (S + tasa_global * m) / (N + m)
+<span class="c"># S = conversiones de esa categoría en meses anteriores</span>
+<span class="c"># N = filas de esa categoría en meses anteriores</span></code></pre>
+
+  <p>El suavizado (<code>m</code>) evita extremos: una categoría con 3 filas y 1 conversión no recibe una tasa de 33 %, sino una cercana a la tasa global. Las filas de diciembre usan todo train. El primer mes de train no tiene pasado y queda vacío.</p>
+
+  <div class="callout anal">
+    <span class="label">Analogía</span>
+    <p>Es como estudiar para un examen con exámenes de años anteriores. Si entre tus apuntes está el examen de este año con las respuestas, sacarás 10 y no habrás aprendido nada. El corte temporal garantiza que solo se estudia con lo que ya había pasado.</p>
+  </div>
+
+  <p><strong>En estos datos no se activa</strong>: las 5 variables de texto tienen entre 3 y 5 categorías, así que todas usan One-Hot. El mecanismo está construido y comprobado (se recalculó a mano una fila y coincidió), por si en otra competencia aparece una variable con muchas categorías. Se puede forzar con <code>--umbral-ohe 4</code>.</p>
+
+  <h3><code>construir_dataset</code>: armar la tabla final</h3>
+  <p>Coordina todo lo anterior y entrega las matrices listas para modelar. Reúne las columnas en este orden y por estas cantidades:</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Grupo de columnas</th><th class="num">Cantidad</th></tr></thead>
+    <tbody>
+      <tr><td>Numéricas originales (12)</td><td class="num">12</td></tr>
+      <tr><td>De sí o no, convertidas a 0 y 1</td><td class="num">5</td></tr>
+      <tr><td>Rezagos, cambios, ventanas y <code>meses_en_ventana3</code></td><td class="num">39</td></tr>
+      <tr><td>One-Hot de las 5 variables de texto (5+5+5+3+4)</td><td class="num">22</td></tr>
+      <tr><th>Total</th><th class="num">78</th></tr>
+    </tbody>
+  </table></div>
+
+  <p>Quedan fuera <code>id_cliente</code> y <code>mes</code>: el identificador no describe al cliente, y diciembre es un mes que el modelo nunca vio en el entrenamiento. Al final separa de nuevo train y test, y <strong>devuelve test en el orden original</strong> del archivo, que es lo que exige la entrega.</p>
+</section>
+
+<!-- ===================================================== 3 -->
+<section class="sec" id="s3">
+  <p class="eyebrow">Sección 3 del código</p>
+  <h2>Selección de características</h2>
+  <p>Tener más variables no siempre ayuda. Las repetidas o inútiles agregan ruido, hacen más lento el entrenamiento y facilitan el sobreajuste. Esta sección aplica tres filtros en cadena. Cada uno es una clase con dos acciones: <code>fit</code> (decide qué conservar mirando los datos) y <code>transform</code> (aplica esa decisión).</p>
+
+  <h3>Filtro 1 · <code>SelectorVarianzaCero</code></h3>
+  <p>Elimina las columnas que tienen un único valor en todas las filas. Una columna que nunca cambia no puede distinguir a un cliente de otro.</p>
+<pre><code>n_unicos = X.nunique(dropna=True)
+self.cols_constantes_ = n_unicos[n_unicos &lt;= 1].index.tolist()</code></pre>
+  <p><strong>Resultado real:</strong> elimina 6 columnas, todas del tipo <code>…_delta1</code> (cambio mensual de saldo, ingresos, productos, etc.). Salen constantes en 0 porque esas variables no cambian entre meses, lo que confirma lo que se vio en los datos.</p>
+
+  <h3>Filtro 2 · <code>SelectorCorrelacion</code></h3>
+  <p>Dos columnas con una correlación de Pearson mayor a 0,95 dicen casi lo mismo (por ejemplo, <code>saldo_promedio</code> y su rezago de 1 mes cuando el saldo no cambia). Se conserva una y se elimina la otra, siempre la que más se parece al resto. Para ir rápido calcula las correlaciones con una muestra de hasta 50.000 filas.</p>
+<pre><code>corr = muestra.corr(method="pearson").abs()</code></pre>
+  <p><strong>Resultado real:</strong> elimina 22 columnas. Son grupos de variables que repiten lo mismo (la variable original, sus rezagos y su promedio móvil); de cada grupo se conserva una.</p>
+
+  <div class="callout anal">
+    <span class="label">Analogía</span>
+    <p>Si tienes una balanza en kilos y otra en libras, no necesitas las dos para saber cuánto pesa algo.</p>
+  </div>
+
+  <h3>Filtro 3 · <code>SelectorImportanciaLGBM</code></h3>
+  <p>Entrena un LightGBM rápido (300 árboles) con las variables que sobrevivieron y mide cuánto aportó cada una a las decisiones del modelo (la "ganancia"). Conserva las 80 más importantes.</p>
+<pre><code>modelo = lgb.LGBMClassifier(n_estimators=300, learning_rate=0.05, ..., importance_type="gain")</code></pre>
+
+  <figure>
+    <div class="funnel">
+      <div class="row"><div class="bar" style="width:100%">78</div><div class="what">Variables creadas en la Sección 2</div></div>
+      <div class="row"><div class="bar" style="width:92%">72</div><div class="what">Tras quitar las 6 constantes</div></div>
+      <div class="row"><div class="bar" style="width:64%">50</div><div class="what">Tras quitar las 22 muy correlacionadas</div></div>
+      <div class="row"><div class="bar" style="width:64%">50</div><div class="what">Tras el filtro de importancia (tope de 80, no recorta nada)</div></div>
+    </div>
+    <figcaption>Cuántas variables quedan después de cada filtro, con los datos reales.</figcaption>
+  </figure>
+
+  <h3><code>seleccionar_features</code>: la cadena completa</h3>
+  <p>Ejecuta los tres filtros en orden y devuelve la lista final de nombres. Un punto esencial: <strong>se ajusta solo con los meses de entrenamiento</strong>, nunca con los de validación. Si no, la variable elegida habría "visto" los meses con los que luego se evalúa y la nota saldría inflada.</p>
+
+  <div class="callout warn">
+    <span class="label">Cuidado al interpretar</span>
+    <p>Entre las más importantes aparecen nombres como <code>numero_productos_roll3_mean</code>. Como esa variable casi no cambia en el tiempo, su promedio móvil vale prácticamente lo mismo que el valor original, y el modelo eligió una de las dos copias. No significa que "el promedio de 3 meses" sea especial. Las señales que más pesan son el número de productos, los días desde la última transacción, la banda de riesgo y el ratio deuda/ingresos.</p>
+  </div>
+</section>
+
+<!-- ===================================================== 4 -->
+<section class="sec" id="s4">
+  <p class="eyebrow">Sección 4 del código</p>
+  <h2>Modelado y validación</h2>
+  <p>Con las variables listas, se entrenan varios modelos y se mide cuál ordena mejor a los clientes. La sección 'Los modelos, uno por uno' (más abajo) explica cada modelo; aquí se explica cómo está montada la comparación.</p>
+
+  <h3>Cómo se parte la información: validación temporal</h3>
+  <p>Para saber si un modelo funciona hay que probarlo con datos que no vio. El código reserva los <strong>últimos 3 meses de train (septiembre a noviembre)</strong> para validar y entrena con enero a agosto:</p>
+
+  <div class="two">
+    <div class="card"><h4>Entrenamiento</h4><p>Enero a agosto<br>80.300 filas (73 %)</p></div>
+    <div class="card"><h4>Validación</h4><p>Septiembre a noviembre<br>29.800 filas (27 %)</p></div>
+  </div>
+
+  <p>Es casi el 70/30 clásico, pero cortado por el calendario y no al azar. Esto no es un capricho. Se midió con el mismo modelo y las mismas variables:</p>
+
+  <div class="tablewrap"><table>
+    <thead><tr><th>Forma de partir los datos</th><th class="num">Gini</th></tr></thead>
+    <tbody>
+      <tr><td>Aleatoria 70/30 (<code>train_test_split</code>)</td><td class="num">0,259</td></tr>
+      <tr><td>Aleatoria por cliente 70/30</td><td class="num">0,268</td></tr>
+      <tr><td>Temporal, validando 3 meses</td><td class="num">0,244</td></tr>
+      <tr><td>Temporal, validando 1 mes</td><td class="num">0,233</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>La partición aleatoria da una nota más alta, y esa nota es engañosa: un mismo cliente aparece en varios meses casi sin cambiar, así que con un corte al azar el modelo ya "conoce" a los clientes de la prueba. La competencia, en cambio, evalúa un mes futuro. La partición por calendario imita eso. Validar con 3 meses en vez de 1 baja el margen de error de la nota de ±0,017 a ±0,010 de Gini.</p>
+
+  <h3><code>construir_modelo</code>: la fábrica</h3>
+  <p>Una sola función que, dado el nombre de una familia ("lightgbm", "xgboost", "catboost", "random_forest") y sus ajustes, devuelve el modelo listo para entrenar. Así el resto del programa no repite código por cada modelo, y agregar uno nuevo (como se hizo con CatBoost) toca pocos lugares. Aquí también viven los ajustes por defecto de cada modelo (<code>PARAMS_DEFECTO</code>) y dos constantes: un máximo de 2000 árboles y una paciencia de 100 para el early stopping.</p>
+
+  <h3><code>EvaluadorModelos</code>: el cuaderno de notas</h3>
+  <p>Es una clase que recibe las tablas de entrenamiento y validación y se encarga de todo lo demás:</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Método</th><th>Qué hace</th></tr></thead>
+    <tbody>
+      <tr><td><code>entrenar_lightgbm</code>, <code>entrenar_xgboost</code>, <code>entrenar_catboost</code>, <code>entrenar_random_forest</code></td><td>Entrena ese modelo con los datos de entrenamiento y lo evalúa con los de validación</td></tr>
+      <tr><td><code>optimizar_lightgbm</code></td><td>Busca los mejores ajustes para LightGBM con Optuna</td></tr>
+      <tr><td><code>metricas</code></td><td>Calcula el AUC y el Gini</td></tr>
+      <tr><td><code>evaluar_todos</code></td><td>Entrena los cuatro modelos, y Optuna si se pidió, y devuelve la tabla comparativa</td></tr>
+      <tr><td><code>resumen</code></td><td>Ordena los resultados de mayor a menor Gini</td></tr>
+    </tbody>
+  </table></div>
+
+<pre><code>auc = roc_auc_score(y_true, y_prob)
+return auc, 2 * auc - 1        <span class="c"># (AUC, Gini)</span></code></pre>
+
+  <h3>Early stopping: saber cuándo parar</h3>
+  <p>Los modelos de boosting suman árboles de a uno. Cada árbol nuevo mejora el entrenamiento, pero llega un punto en que empieza a memorizar y la validación deja de mejorar. El <em>early stopping</em> vigila el AUC de validación y, si pasan 100 árboles seguidos sin mejora, se detiene y se queda con el mejor momento.</p>
+<pre><code>m.fit(self.X_train, self.y_train, eval_set=[(self.X_val, self.y_val)], eval_metric="auc",
+      callbacks=[lgb.early_stopping(ES_ROUNDS, verbose=False)])</code></pre>
+  <div class="callout anal">
+    <span class="label">Analogía</span>
+    <p>Es dejar de estudiar cuando los simulacros dejan de mejorar. Estudiar más solo te hace memorizar las preguntas de los simulacros.</p>
+  </div>
+
+  <h3>Optuna: probar ajustes de forma inteligente</h3>
+  <p>Cada modelo tiene "perillas" (hiperparámetros): cuántas hojas por árbol, qué velocidad de aprendizaje, cuánta regularización. Optuna no es un modelo; es un <strong>buscador</strong> que prueba combinaciones de perillas (30 por defecto) y aprende de las anteriores para elegir mejor las siguientes. Se aplica a LightGBM y el resultado aparece como una fila aparte, <code>LightGBM_Optuna</code>.</p>
+<pre><code>learning_rate    = trial.suggest_float("learning_rate", 0.01, 0.1, log=True)
+num_leaves       = trial.suggest_int("num_leaves", 8, 256, log=True)
+min_child_samples = trial.suggest_int("min_child_samples", 10, 300, log=True)
+<span class="c"># ... y subsample, colsample_bytree, reg_alpha, reg_lambda</span></code></pre>
+
+  <div class="callout warn">
+    <span class="label">Cuidado</span>
+    <p>Tanto el early stopping como Optuna usan los meses de validación para decidir. Por eso las notas del reporte son ligeramente optimistas respecto a lo que se obtendrá en la competencia. Es la misma ventaja para todos los modelos de boosting, así que la comparación entre ellos es justa.</p>
+  </div>
+</section>
+
+<!-- ===================================================== 5 -->
+<section class="sec" id="s5">
+  <p class="eyebrow">Sección 5 del código</p>
+  <h2>Entrenamiento final y entrega</h2>
+  <p>Ya se sabe qué modelo ordena mejor. Falta producir la predicción de diciembre.</p>
+
+  <h3><code>entrenar_y_predecir_final</code></h3>
+  <p>Reentrena el modelo ganador con el <strong>100 % de train</strong> (enero a noviembre), porque con más datos aprende mejor, y predice test. Dos decisiones merecen explicación:</p>
+  <ul>
+    <li><strong>Cuántos árboles.</strong> El early stopping ya no se puede usar, porque no queda un conjunto de validación. Se toma el número de árboles que resultó óptimo y se multiplica por la proporción de datos extra. Con 110.100 filas frente a 80.300, el factor es ≈ 1,37.
+<pre><code>n_iter = max(10, int(round(mejor_iter * factor_datos)))</code></pre></li>
+    <li><strong>Varias semillas.</strong> Se entrena el modelo 3 veces con semillas distintas y se promedian las predicciones. Un modelo depende un poco del azar; el promedio es más estable que cualquiera de las tres.</li>
+  </ul>
+  <p>Al final las probabilidades se recortan al rango de 0 a 1 por seguridad.</p>
+
+  <h3><code>exportar_submission</code></h3>
+  <p>Antes de escribir el archivo hace comprobaciones y se detiene con un error si alguna falla. Un archivo mal formado puede descalificar una entrega, así que es mejor que el programa se niegue a escribirlo.</p>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Comprobación</th><th>Por qué importa</th></tr></thead>
+    <tbody>
+      <tr><td>Mismo número de filas que <code>test.csv</code></td><td>Debe haber una predicción por cliente</td></tr>
+      <tr><td>Los <code>id_cliente</code> en el mismo orden que <code>test.csv</code></td><td>La plataforma empareja por posición e identificador</td></tr>
+      <tr><td>Todas las predicciones entre 0 y 1, sin vacíos</td><td>Son probabilidades</td></tr>
+      <tr><td>Mismos identificadores que <code>sample_submission.csv</code></td><td>Es la plantilla oficial de la entrega</td></tr>
+    </tbody>
+  </table></div>
+  <p>El archivo tiene exactamente dos columnas: <code>id_cliente,prediccion</code>. No incluye <code>mes</code>, porque todo test es diciembre.</p>
+</section>
+
+<!-- ===================================================== 6 -->
+<section class="sec" id="s6">
+  <p class="eyebrow">Sección 6 del código</p>
+  <h2>El programa principal</h2>
+  <p>La función <code>main</code> no hace cálculos propios. Llama en orden a todas las anteriores. Leerla es el mejor resumen de todo el proyecto:</p>
+  <ol>
+    <li><strong>Cargar y comprobar</strong> los archivos, e imprimir el diagnóstico (Sección 1).</li>
+    <li><strong>Crear las variables</strong> (Sección 2).</li>
+    <li><strong>Partir por calendario</strong> en entrenamiento (enero a agosto) y validación (septiembre a noviembre).</li>
+    <li><strong>Seleccionar variables</strong> usando solo el entrenamiento (Sección 3).</li>
+    <li><strong>Comparar modelos</strong> y quedarse con el de mayor Gini (Sección 4).</li>
+    <li><strong>Reentrenar con todo, predecir y exportar</strong> (Sección 5).</li>
+    <li><strong>Guardar archivos de trazabilidad</strong> junto al submission.</li>
+  </ol>
+
+  <h3>Qué se genera</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Archivo</th><th>Para qué sirve</th></tr></thead>
+    <tbody>
+      <tr><td><code>submission.csv</code></td><td>La entrega para la competencia</td></tr>
+      <tr><td><code>resultados_validacion.csv</code></td><td>AUC y Gini de cada modelo, para revisar la comparación</td></tr>
+      <tr><td><code>features_seleccionadas.txt</code></td><td>Las variables finales, de más a menos importante</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Cómo se ejecuta</h3>
+<pre><code>python pipeline.py --datos ./data --salida ./salida/submission.csv --trials 30</code></pre>
+  <p>Los argumentos (<code>--datos</code>, <code>--salida</code>, <code>--trials</code>, <code>--meses-val</code>, <code>--top-k</code>, <code>--umbral-ohe</code>, <code>--n-seeds</code>, <code>--semilla</code>) son la forma de cambiar la configuración sin tocar el código. Su detalle está en el <code>README.md</code> del proyecto. Con <code>--trials 0</code> se omite Optuna y la ejecución es mucho más rápida. En total tarda alrededor de 2 minutos.</p>
+</section>
+
+<!-- ===================================================== M -->
+<section class="sec" id="modelos">
+  <p class="eyebrow">Parte aparte</p>
+  <h2>Los modelos, uno por uno</h2>
+  <p>El programa compara cuatro modelos. Los cuatro hacen lo mismo en esencia (reciben las variables de un cliente y devuelven una probabilidad) y los cuatro están construidos con <strong>árboles de decisión</strong>. Lo que cambia es cómo combinan esos árboles.</p>
+
+  <h3>La pieza base: el árbol de decisión</h3>
+  <p>Un árbol es una cadena de preguntas de sí o no que va separando a los clientes en grupos. Por ejemplo: "¿Tiene más de 3 productos? Si sí, ¿su riesgo es bajo? …". Cada grupo final (una hoja) recibe la tasa de conversión de los clientes que cayeron en él. Un árbol solo es fácil de entender, pero impreciso y muy sensible a los detalles. La fuerza viene de juntar muchos.</p>
+
+  <h3>Dos formas de juntar árboles</h3>
+  <div class="two">
+    <div class="card">
+      <h4>Bosque (bagging): en paralelo</h4>
+      <div class="chips"><span class="chip">Árbol 1</span><span class="chip">Árbol 2</span><span class="chip">Árbol 3</span><span class="chip">…</span><span class="arrow">→</span><span class="chip fix">promedio</span></div>
+      <p>Muchos árboles se entrenan de forma independiente, cada uno con una muestra distinta de filas y columnas. Al final votan y se promedian sus resultados. Los errores individuales tienden a cancelarse.</p>
+    </div>
+    <div class="card">
+      <h4>Boosting: en serie</h4>
+      <div class="chips"><span class="chip">Árbol 1</span><span class="arrow">→</span><span class="chip">corrige 1</span><span class="arrow">→</span><span class="chip">corrige 2</span><span class="arrow">→</span><span class="chip fix">suma</span></div>
+      <p>Los árboles se entrenan uno tras otro. Cada nuevo árbol se concentra en los errores que dejó el conjunto anterior. La predicción final es la suma de todas las correcciones, cada una multiplicada por una "velocidad de aprendizaje" pequeña.</p>
+    </div>
+  </div>
+
+  <div class="callout anal">
+    <span class="label">Analogía</span>
+    <p>Bosque: pedirle su opinión a 300 personas que no se hablan entre sí y quedarte con el promedio. Boosting: un equipo donde cada persona revisa el trabajo de la anterior y arregla solo lo que quedó mal.</p>
+  </div>
+
+  <h3>Random Forest</h3>
+  <p><span class="tag">Bosque</span> Es el representante del bagging. En el código usa 300 árboles, exige al menos 20 clientes por hoja, en cada división solo considera una parte de las columnas (la raíz cuadrada del total) y cada árbol entrena con el 70 % de las filas.</p>
+  <ul>
+    <li><strong>Fortalezas:</strong> muy difícil de estropear, casi no necesita ajuste, resiste bien el ruido.</li>
+    <li><strong>Debilidades:</strong> suele quedar por debajo del boosting cuando hay patrones sutiles; es el más lento aquí (unos 20 segundos frente a 2 a 5 de los otros). Como versiones antiguas de scikit-learn no admiten datos vacíos, el código los rellena con la mediana antes de entrenarlo.</li>
+  </ul>
+
+  <h3>LightGBM</h3>
+  <p><span class="tag">Boosting</span> De Microsoft. Está diseñado para ser muy rápido: agrupa los valores numéricos en "cajones" (histogramas) antes de buscar los cortes, y hace crecer cada árbol <strong>por hoja</strong>, es decir, siempre divide la hoja que más reduce el error, sin importar a qué nivel esté. Eso lo hace eficaz, pero con riesgo de árboles muy desparejos si no se limita el número de hojas.</p>
+  <ul>
+    <li><strong>Ajustes principales en el código:</strong> 31 hojas por árbol, velocidad de aprendizaje 0,03, mínimo de 50 clientes por hoja, 80 % de filas y 70 % de columnas por árbol.</li>
+    <li><strong>Fortalezas:</strong> velocidad, buen rendimiento con tablas grandes, gran cantidad de ajustes disponibles.</li>
+    <li><strong>Es el modelo que se ajusta con Optuna</strong> y el que ganó la comparación.</li>
+  </ul>
+
+  <h3>XGBoost</h3>
+  <p><span class="tag">Boosting</span> El modelo que popularizó el boosting en competencias. También usa histogramas, pero hace crecer el árbol <strong>por niveles</strong>: divide todas las hojas de un nivel antes de pasar al siguiente, hasta una profundidad máxima. Tiene regularización incorporada para frenar el sobreajuste.</p>
+  <ul>
+    <li><strong>Ajustes principales en el código:</strong> profundidad máxima 6, velocidad de aprendizaje 0,03, peso mínimo por hoja 5.</li>
+    <li><strong>Fortalezas:</strong> muy probado, estable, buen control del sobreajuste.</li>
+    <li><strong>Debilidades:</strong> históricamente algo más lento que LightGBM; árboles por niveles pueden ser menos flexibles.</li>
+  </ul>
+
+  <h3>CatBoost</h3>
+  <p><span class="tag">Boosting</span> De Yandex. Dos rasgos lo distinguen. Primero, sus árboles son <strong>simétricos</strong>: en cada nivel se usa la misma pregunta para todas las ramas, lo que da árboles más simples y más resistentes al sobreajuste. Segundo, está pensado para tratar variables de texto directamente, con técnicas que evitan la fuga de datos al codificarlas.</p>
+  <ul>
+    <li><strong>Ajustes principales en el código:</strong> profundidad 6, velocidad de aprendizaje 0,05, regularización L2 de 3.</li>
+    <li><strong>Fortalezas:</strong> buen rendimiento sin ajustar casi nada, estable.</li>
+    <li><strong>Aquí no aprovecha su mayor ventaja</strong>: las variables de texto ya llegan convertidas a 0 y 1 (One-Hot), así que corre como cualquier otro modelo de árboles.</li>
+  </ul>
+
+  <h3>Comparación lado a lado</h3>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Modelo</th><th>Familia</th><th>Cómo crece cada árbol</th><th>Ritmo aquí</th><th>Gini en validación</th></tr></thead>
+    <tbody>
+      <tr><td>Random Forest</td><td>Bosque</td><td>Independientes, con muestras al azar</td><td>Lento (~20 s)</td><td class="num">0,241</td></tr>
+      <tr><td>LightGBM</td><td>Boosting</td><td>Por hoja (la de mayor ganancia)</td><td>Rápido (~2 s)</td><td class="num">0,246</td></tr>
+      <tr><td>XGBoost</td><td>Boosting</td><td>Por niveles hasta una profundidad</td><td>Rápido (~4 s)</td><td class="num">0,246</td></tr>
+      <tr><td>CatBoost</td><td>Boosting</td><td>Simétrico: misma pregunta en todo el nivel</td><td>Rápido (~5 s)</td><td class="num">0,247</td></tr>
+      <tr><td>LightGBM + Optuna</td><td>Boosting con ajuste automático</td><td>Como LightGBM, con 30 pruebas de ajustes</td><td>~80 s con la búsqueda</td><td class="num">0,250</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>Resultados reales de la comparación</h3>
+  <p>Septiembre a noviembre como validación:</p>
+
+  <div class="hbars" role="img" aria-label="Gini en validación: LightGBM con Optuna 0,2505; CatBoost 0,2467; XGBoost 0,2464; LightGBM 0,2464; RandomForest 0,2407">
+    <div class="hbar win"><span>LightGBM + Optuna</span><div class="track"><div class="fill" style="width:83.5%">0,2505</div></div></div>
+    <div class="hbar"><span>CatBoost</span><div class="track"><div class="fill" style="width:82.2%">0,2467</div></div></div>
+    <div class="hbar"><span>XGBoost</span><div class="track"><div class="fill" style="width:82.1%">0,2464</div></div></div>
+    <div class="hbar"><span>LightGBM</span><div class="track"><div class="fill" style="width:82.1%">0,2464</div></div></div>
+    <div class="hbar"><span>Random Forest</span><div class="track"><div class="fill" style="width:80.2%">0,2407</div></div></div>
+  </div>
+  <p style="font-family:var(--font-head);font-size:14px;color:var(--muted)">Las barras parten de cero y la escala llega a 0,30, por eso se ven casi iguales: lo son.</p>
+
+  <h3>Por qué dan casi lo mismo</h3>
+  <p>Entre el mejor y el peor hay 0,01 de Gini, y la nota tiene un margen de error de unos ±0,010. Es decir, <strong>la diferencia entre modelos no se distingue del ruido</strong>. Hay tres razones razonables:</p>
+  <ul>
+    <li>La señal que hay en los datos es limitada, y cualquier modelo decente la encuentra.</li>
+    <li>Casi todas las variables son fijas por cliente, así que hay poca información extra que un modelo más sofisticado pueda aprovechar.</li>
+    <li>Son modelos de la misma familia (árboles), con la misma materia prima.</li>
+  </ul>
+  <p>Que gane LightGBM + Optuna se debe en parte a que es el único al que se le buscaron ajustes de forma activa. Habría que dar el mismo trato a los otros para una comparación estrictamente igualitaria.</p>
+
+  <h3>¿Cuál usar?</h3>
+  <p>El programa elige automáticamente al de mayor Gini en validación, y ese es el que se reentrena con todo para la entrega. En la práctica, cualquiera de los tres de boosting es una elección defendible aquí. Lo que más movería el resultado no es cambiar de modelo, sino conseguir variables con más información sobre el cliente.</p>
+</section>
+
+<!-- ===================================================== G -->
+<section class="sec" id="glosario">
+  <p class="eyebrow">Parte final</p>
+  <h2>Glosario</h2>
+  <dl class="gloss">
+    <dt>AUC</dt><dd>Área bajo la curva ROC. Probabilidad de que el modelo ponga a un cliente que convirtió por encima de uno que no. 0,5 es azar; 1 es perfecto.</dd>
+    <dt>Gini</dt><dd><code>2 × AUC − 1</code>. Es el AUC reescrito para que el azar valga 0. La métrica de la competencia.</dd>
+    <dt>Bagging</dt><dd>Entrenar muchos modelos independientes con muestras al azar y promediarlos. Es la idea del Random Forest.</dd>
+    <dt>Boosting</dt><dd>Entrenar modelos en serie, cada uno corrigiendo los errores del conjunto anterior. Es la idea de LightGBM, XGBoost y CatBoost.</dd>
+    <dt>Early stopping</dt><dd>Detener el entrenamiento cuando la validación deja de mejorar durante un número de rondas.</dd>
+    <dt>Fuga de datos (leakage)</dt><dd>Que el modelo use información que no tendría al predecir en la vida real. Infla las pruebas y arruina el resultado real.</dd>
+    <dt>Hiperparámetro</dt><dd>Un ajuste del modelo que se decide antes de entrenar (profundidad, velocidad de aprendizaje). No lo aprende el modelo.</dd>
+    <dt>Importancia de variables</dt><dd>Medida de cuánto contribuyó cada variable a las decisiones del modelo.</dd>
+    <dt>One-Hot Encoding</dt><dd>Convertir una categoría en varias columnas de 0 y 1, una por valor posible.</dd>
+    <dt>Optuna</dt><dd>Librería que busca automáticamente buenos hiperparámetros probando combinaciones.</dd>
+    <dt>Pearson (correlación)</dt><dd>Número entre −1 y 1 que dice cuánto se mueven juntas dos columnas. Cerca de ±1 significa que dicen casi lo mismo.</dd>
+    <dt>Rezago (lag)</dt><dd>El valor de una variable en un mes anterior.</dd>
+    <dt>Semilla (seed)</dt><dd>Número que fija el azar para que los resultados se puedan repetir.</dd>
+    <dt>Sobreajuste (overfitting)</dt><dd>Cuando el modelo memoriza el entrenamiento y falla con datos nuevos.</dd>
+    <dt>Target Encoding</dt><dd>Reemplazar una categoría por la tasa histórica del objetivo en esa categoría. Requiere cuidado temporal para no filtrar la respuesta.</dd>
+    <dt>Validación temporal</dt><dd>Separar entrenamiento y validación por fecha, entrenando con el pasado y evaluando con el período siguiente.</dd>
+    <dt>Ventana móvil (rolling)</dt><dd>Un cálculo (promedio, suma) sobre los últimos N meses.</dd>
+  </dl>
+</section>
+
+</div>
+
+<script>
+(function () {
+  var r = document.getElementById('auc');
+  if (!r) return;
+  var a = document.getElementById('aucv'), g = document.getElementById('ginv'), m = document.getElementById('aucmsg');
+  function fmt(x) { return x.toFixed(3).replace('.', ','); }
+  function upd() {
+    var auc = parseFloat(r.value), gini = 2 * auc - 1;
+    a.textContent = fmt(auc);
+    g.textContent = fmt(gini);
+    var pct = Math.round(auc * 100 * 10) / 10;
+    var txt;
+    if (auc < 0.505) txt = 'Equivale a adivinar al azar. El modelo no ordena mejor que lanzar una moneda.';
+    else if (Math.abs(auc - 0.625) < 0.012) txt = 'Zona de nuestros resultados (Gini ≈ 0,25). En ' + String(pct).replace('.', ',') + ' de cada 100 comparaciones, el modelo le da más puntaje al cliente que sí convirtió.';
+    else if (auc >= 0.995) txt = 'Orden perfecto. En la práctica, un valor así casi siempre indica fuga de datos.';
+    else txt = 'En ' + String(pct).replace('.', ',') + ' de cada 100 comparaciones entre un cliente que convirtió y uno que no, el modelo ordena bien.';
+    m.textContent = txt;
+  }
+  r.addEventListener('input', upd);
+  upd();
+})();
+</script>
+
+</body></html>

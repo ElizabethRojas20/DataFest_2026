@@ -34,7 +34,7 @@ Dentro de `pipeline.py` el código está organizado en secciones:
 | Carga y diagnóstico | `cargar_datos`, `validar_esquema`, `diagnostico_inicial` |
 | Ingeniería de características | `crear_features_temporales` (lags, deltas, ventanas), `target_encoding_temporal`, `construir_dataset` |
 | Selección | `SelectorVarianzaCero`, `SelectorCorrelacion`, `SelectorImportanciaLGBM`, `seleccionar_features` |
-| Modelado | `EvaluadorModelos` (LightGBM, XGBoost, RandomForest + Optuna) y `construir_modelo` |
+| Modelado | `EvaluadorModelos` (LightGBM, XGBoost, CatBoost, RandomForest + Optuna) y `construir_modelo` |
 | Entrega | `entrenar_y_predecir_final`, `exportar_submission` |
 | `main` | Orquesta todo en orden |
 
@@ -42,7 +42,7 @@ Dentro de `pipeline.py` el código está organizado en secciones:
 
 ## 2. Instalación
 
-Requiere **Python 3.10 o superior**. Se probó con Python 3.13, pandas 3.0, scikit-learn 1.9, LightGBM 4.7, XGBoost 3.4 y Optuna 5.0. Versiones mínimas: scikit-learn ≥ 1.2 y xgboost ≥ 1.6.
+Requiere **Python 3.10 o superior**. Se probó con Python 3.13, pandas 3.0, scikit-learn 1.9, LightGBM 4.7, XGBoost 3.4, CatBoost 1.2 y Optuna 5.0. Versiones mínimas: scikit-learn ≥ 1.2 y xgboost ≥ 1.6.
 
 Recomendado: usar un entorno virtual para no mezclar librerías con otros proyectos.
 
@@ -51,7 +51,7 @@ Recomendado: usar un entorno virtual para no mezclar librerías con otros proyec
 python -m venv .venv
 .venv\Scripts\activate
 python -m pip install -U pip
-python -m pip install -U pandas numpy scikit-learn lightgbm xgboost optuna
+python -m pip install -U pandas numpy scikit-learn lightgbm xgboost catboost optuna
 ```
 
 **Mac / Linux:**
@@ -59,12 +59,12 @@ python -m pip install -U pandas numpy scikit-learn lightgbm xgboost optuna
 python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -U pip
-python -m pip install -U pandas numpy scikit-learn lightgbm xgboost optuna
+python -m pip install -U pandas numpy scikit-learn lightgbm xgboost catboost optuna
 ```
 
 Para comprobar que quedó bien:
 ```bash
-python -c "import pandas, sklearn, lightgbm, xgboost, optuna; print('OK')"
+python -c "import pandas, sklearn, lightgbm, xgboost, catboost, optuna; print('OK')"
 ```
 
 > **Mac con chip Apple:** si LightGBM falla al importar con un error sobre `libomp`, instala OpenMP con `brew install libomp`.
@@ -112,7 +112,7 @@ python pipeline.py --datos ./data --salida ./salida/submission.csv --meses-val 4
 1. **Carga y validación:** comprueba columnas, que no haya duplicados cliente-mes y muestra un diagnóstico del dataset.
 2. **Features:** rezagos de 1, 2 y 3 meses, cambio mensual (delta), medias y sumas de ventana de 3 meses, One-Hot / Target Encoding temporal.
 3. **Selección:** elimina constantes, luego variables con correlación de Pearson > 0,95, luego se queda con las más importantes según un LightGBM rápido.
-4. **Validación:** entrena y compara LightGBM, XGBoost, RandomForest y LightGBM con Optuna; reporta AUC y Gini.
+4. **Validación:** entrena y compara LightGBM, XGBoost, CatBoost, RandomForest y LightGBM con Optuna; reporta AUC y Gini.
 5. **Entrega:** reentrena el ganador con el 100 % de `train.csv`, predice `test.csv` y exporta `submission.csv`.
 
 ---
@@ -144,6 +144,7 @@ Validación temporal (entrenamiento: enero–agosto; validación: septiembre–n
 | Modelo | Gini |
 |---|---|
 | LightGBM + Optuna | ≈ 0,250 |
+| CatBoost | ≈ 0,247 |
 | XGBoost | ≈ 0,246 |
 | LightGBM | ≈ 0,246 |
 | RandomForest | ≈ 0,241 |
@@ -170,5 +171,5 @@ Las diferencias entre modelos (< 0,01) están dentro del ruido de la métrica co
 
 - **Cambiar variables con lags o ventanas:** editar `cols_lag` y `cols_rolling` en `Config`.
 - **Probar otros hiperparámetros por defecto:** editar el diccionario `PARAMS_DEFECTO`.
-- **Añadir un modelo:** agregar su familia en `construir_modelo` y un método `entrenar_*` en `EvaluadorModelos`.
+- **Añadir un modelo:** agregar su familia en `construir_modelo`, sus parámetros en `PARAMS_DEFECTO` y un método `entrenar_*` en `EvaluadorModelos` (el ejemplo más reciente es CatBoost).
 - **Antes de subir una entrega nueva**, correr una vez completo (`--trials 30`) y revisar `resultados_validacion.csv`. Guardar con nombre y fecha las entregas que se envíen, para poder comparar contra el puntaje de la plataforma.
