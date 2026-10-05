@@ -1,42 +1,7 @@
 # ============================================================
 # .gitignore — DataFest: propensión de conversión
-# Regla general: en el repositorio va el CÓDIGO y DOCUMENTACIÓN, no los datos pesados ni secretos.
+# Regla general: en el repositorio va TODO (código, datos, modelos, resultados) para que el equipo vea todo.
 # ============================================================
-
-# ---------- Datasets (pesados y/o confidenciales) ----------
-# Se ignora todo lo que haya dentro de datos_entrada/ ...
-datos_entrada/*
-# ... excepto metadatos y descripción
-!datos_entrada/.gitkeep
-!datos_entrada/metaData.csv
-!datos_entrada/DATASET_DESCRIPTION.md
-
-# Por si alguien deja los CSV en la raíz (p. ej. usando --datos .)
-/train.csv
-/test.csv
-/sample_submission.csv
-
-# Otros formatos de datos y artefactos pesados
-*.parquet
-*.feather
-*.pkl
-*.pickle
-*.joblib
-*.ubj
-*.npy
-*.npz
-*.h5
-*.keras
-
-# ---------- Resultados generados por el pipeline ----------
-# submission.csv, resultados_validacion.csv, features_seleccionadas.txt, etc.
-# (derivan de los datos de la competencia; se regeneran con pipeline.py)
-resultados_reportes/*
-!resultados_reportes/.gitkeep
-
-# ---------- Modelos entrenados (pesados) ----------
-modelos/*
-!modelos/.gitkeep
 
 # ---------- Secretos y credenciales (NUNCA subir) ----------
 .env
@@ -95,6 +60,9 @@ desktop.ini
 .vscode/
 *.swp
 *~
+
+# ---------- Claude / IDE ----------
+.claude/
 
 # ---------- Secretos y credenciales (NUNCA subir) ----------
 .env
