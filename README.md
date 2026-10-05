@@ -1,4 +1,4 @@
-# DataFest — Propensión de conversión de clientes
+# DataFest 2026 — Propensión de Conversión de Clientes
 
 Documento interno del equipo. Explica cómo está organizado el proyecto, cómo preparar el entorno y cómo ejecutar el pipeline que genera el archivo de entrega.
 
@@ -8,25 +8,42 @@ Documento interno del equipo. Explica cómo está organizado el proyecto, cómo 
 
 ---
 
-## 1. Estructura del proyecto
+## 1. Estructura del Proyecto
 
 ```text
-.
-├── README.md                   # este documento
-├── pipeline.py                 # TODO el pipeline (features -> selección -> modelos -> submission)
-├── data/                       # entradas (no se versionan si pesan o son confidenciales)
-│   ├── train.csv
-│   ├── test.csv
-│   ├── sample_submission.csv
-│   ├── metaData.csv
-│   └── DATASET_DESCRIPTION.md
-└── salida/                     # lo genera el pipeline
-    ├── submission.csv          # archivo a subir a la competencia
-    ├── resultados_validacion.csv   # AUC y Gini de cada modelo en validación
-    └── features_seleccionadas.txt  # variables finales usadas por el modelo
+DataFest_2026/
+├── README.md                      # Este documento
+├── gitignore.txt                  # Patrones para .gitignore
+├── datos_entrada/                 # Datos originales (no versionar si son confidenciales/pesados)
+│   ├── train.csv                  # Entrenamiento: ene–nov 2026 (con objetivo)
+│   ├── test.csv                   # Prueba: dic 2026 (sin objetivo)
+│   └── sample_submission.csv      # Formato de entrega de referencia
+├── pipelines/                     # Versiones del pipeline de modelado
+│   ├── Pipeline_DF_1.py           # v1: LightGBM, XGBoost, RandomForest
+│   ├── Pipeline_DF_WCB.py         # v2 ⭐: + CatBoost, validación temporal robusta (RECOMENDADO)
+│   └── Pipeline_DF_New.py         # v3: Refinamiento de v2
+├── resultados_reportes/           # Artefactos generados por los pipelines
+│   ├── submission.csv             # Entrega final (id_cliente, prediccion)
+│   ├── Validation_results_DF_1.csv
+│   ├── resultados_validacion_DF_WCB.csv
+│   ├── validation_results_DF_new.csv
+│   ├── features_seleccionadas_DF_1.txt
+│   ├── features_seleccionadas_DF_WCB.txt
+│   └── features_seleccionadas_new.txt
+├── documentacion/                 # Documentos de referencia y reportes
+│   ├── DataFest 2026.html         # Informe ejecutivo visual
+│   ├── Guía del Pipeline DataFest.html  # Guía técnica detallada
+│   ├── INFORME_DATAFEST_2026.md   # Informe técnico completo (Markdown)
+│   └── informe_ejecutivo.html     # Informe ejecutivo visual (HTML)
+├── notebooks/                     # Análisis exploratorio, EDA, experimentos (Jupyter)
+│   └── (aquí iremos creando notebooks)
+├── modelos/                       # Modelos entrenados serializados (.pkl, .joblib, .h5)
+│   └── (para guardar modelos finales)
+└── scripts_utilitarios/           # Scripts auxiliares, utilidades, helpers
+    └── (scripts de apoyo)
 ```
 
-Dentro de `pipeline.py` el código está organizado en secciones:
+Dentro de cada pipeline el código está organizado en secciones:
 
 | Sección | Qué contiene |
 |---|---|
@@ -75,17 +92,22 @@ python -c "import pandas, sklearn, lightgbm, xgboost, catboost, optuna; print('O
 
 Los comandos se escriben en la **terminal** (no dentro de Python ni de un notebook). Si usas Jupyter o Colab, antepón `!` al comando.
 
-1. Coloca `train.csv`, `test.csv` y `sample_submission.csv` en `data/`.
+1. Los CSV ya están en `datos_entrada/`.
 2. Abre la terminal en la carpeta del proyecto (con el entorno virtual activado).
 3. Ejecuta:
 
 ```bash
-python pipeline.py --datos ./data --salida ./salida/submission.csv --trials 30
+# Pipeline recomendado (v2 - DF_WCB) ~2 minutos
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission.csv --trials 30
+
+# Opciones útiles:
+# --meses-val 3     # Últimos 3 meses para validación (default)
+# --top-k 80        # Máx. features tras selección
+# --n-seeds 3       # Semillas a promediar en modelo final
+# --trials 0        # Desactiva Optuna (más rápido para tests)
 ```
 
-Tarda unos 2 minutos. Al terminar deja en `salida/` el `submission.csv` y los archivos de trazabilidad.
-
-### Argumentos
+### Argumentos Principales
 
 | Argumento | Por defecto | Descripción |
 |---|---|---|
@@ -101,10 +123,10 @@ Tarda unos 2 minutos. Al terminar deja en `salida/` el `submission.csv` y los ar
 Ejemplos útiles:
 ```bash
 # Corrida rápida para probar cambios (sin Optuna, una semilla)
-python pipeline.py --datos ./data --salida ./salida/prueba.csv --trials 0 --n-seeds 1
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/prueba.csv --trials 0 --n-seeds 1
 
 # Validar con más meses
-python pipeline.py --datos ./data --salida ./salida/submission.csv --meses-val 4
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission.csv --meses-val 4
 ```
 
 ### Qué hace, paso a paso
@@ -117,7 +139,7 @@ python pipeline.py --datos ./data --salida ./salida/submission.csv --meses-val 4
 
 ---
 
-## 4. Reglas del proyecto (léanlas antes de modificar el código)
+## 4. Reglas del Proyecto (léanlas antes de modificar el código)
 
 - **Validación temporal, no aleatoria.** No usar `train_test_split` aleatorio. Un mismo cliente aparece en varios meses con casi todas sus variables fijas, y el test es un mes futuro; una partición aleatoria infla la métrica (en pruebas dio un Gini 0,015–0,025 más alto que la partición temporal).
 - **Cero información del futuro.** Los lags y ventanas solo miran meses anteriores del mismo cliente. El Target Encoding de una fila usa únicamente objetivos de meses anteriores. Nunca crear variables con datos de meses posteriores.
@@ -128,7 +150,7 @@ python pipeline.py --datos ./data --salida ./salida/submission.csv --meses-val 4
 
 ---
 
-## 5. Qué sabemos de los datos
+## 5. Qué Sabemos de los Datos
 
 - Ningún cliente reaparece después de convertir (`objetivo = 1`).
 - La tasa de conversión ronda el 15 % y es estable entre meses.
@@ -137,7 +159,9 @@ python pipeline.py --datos ./data --salida ./salida/submission.csv --meses-val 4
 - Tras los filtros quedan unas 50 variables, por debajo del tope de 80.
 - Las 5 categóricas tienen entre 3 y 5 niveles, así que con el umbral por defecto todas van a One-Hot.
 
-## 6. Resultados de referencia
+---
+
+## 6. Resultados de Referencia
 
 Validación temporal (entrenamiento: enero–agosto; validación: septiembre–noviembre):
 
@@ -153,7 +177,7 @@ Las diferencias entre modelos (< 0,01) están dentro del ruido de la métrica co
 
 ---
 
-## 7. Problemas frecuentes
+## 7. Problemas Frecuentes
 
 | Síntoma | Causa y solución |
 |---|---|
@@ -167,9 +191,36 @@ Las diferencias entre modelos (< 0,01) están dentro del ruido de la métrica co
 
 ---
 
-## 8. Cómo extender el pipeline
+## 8. Cómo Extender el Pipeline
 
 - **Cambiar variables con lags o ventanas:** editar `cols_lag` y `cols_rolling` en `Config`.
 - **Probar otros hiperparámetros por defecto:** editar el diccionario `PARAMS_DEFECTO`.
 - **Añadir un modelo:** agregar su familia en `construir_modelo`, sus parámetros en `PARAMS_DEFECTO` y un método `entrenar_*` en `EvaluadorModelos` (el ejemplo más reciente es CatBoost).
 - **Antes de subir una entrega nueva**, correr una vez completo (`--trials 30`) y revisar `resultados_validacion.csv`. Guardar con nombre y fecha las entregas que se envíen, para poder comparar contra el puntaje de la plataforma.
+
+---
+
+## 9. Próximos Pasos (Work in Progress)
+
+- [x] **Notebook de Análisis Exploratorio (EDA)** completo en `notebooks/01_eda_completo.ipynb`
+- [x] **Análisis de calidad de datos** (nulos, duplicados, outliers, consistencia temporal) ✅ Dataset limpio
+- [x] **Matriz de correlación** y análisis de variables más trascendentes ✅ Ver `resultados_reportes/`
+- [x] **Feature engineering avanzado** (interacciones, nuevas features derivadas) ✅ Ver sección 6 del informe
+- [x] **Experimentación con Redes Neuronales** (TensorFlow/Keras / scikit-learn MLP) ✅ Gini 0.2294 / 0.1854
+- [ ] **Análisis SHAP** para interpretabilidad
+- [ ] **Walk-forward validation** para estimación más robusta
+- [ ] **Ensemble final** (LightGBM + CatBoost + NN Keras)
+- [ ] **Optuna tuning para Neural Network**
+
+---
+
+## 10. Informe Final Completo
+
+Ver **[INFORME_FINAL_DATAFEST_2026.md](INFORME_FINAL_DATAFEST_2026.md)** para el análisis exhaustivo con:
+- Estadísticas descriptivas completas
+- Matriz de correlación (Pearson)
+- Importancia de variables (Random Forest)
+- Comparativa de modelos (Gini)
+- Arquitecturas de Redes Neuronales
+- Feature engineering propuesto
+- Próximos pasos priorizados
