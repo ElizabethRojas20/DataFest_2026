@@ -146,11 +146,13 @@ python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_re
 | `--datos` | `.` | Carpeta donde están los CSV de entrada. |
 | `--salida` | `submission.csv` | Ruta del archivo de entrega. Los archivos auxiliares se guardan en la misma carpeta. |
 | `--trials` | `30` | Nº de pruebas de Optuna para ajustar LightGBM. `0` desactiva Optuna (más rápido). |
-| `--folds` | `1` | Nº de folds walk-forward (1 = solo sep–nov; 4 = dic, nov, oct, sep). |
-| `--modo-features` | `temporal` | `"estatico"` (solo originales + valor actual interacción) o `"temporal"` (con lags/deltas/rolling). |
+| `--folds` | `4` | Nº de folds walk-forward (4 = dic, nov, oct, sep). |
+| `--modo-features` | `estatico` | `"estatico"` (solo originales + valor actual interacción) o `"temporal"` (con lags/deltas/rolling). |
 | `--top-k` | `80` | Máximo de variables a conservar tras la selección. |
 | `--n-seeds` | `3` | Semillas que se promedian en el modelo final. |
 | `--semilla` | `42` | Semilla base (reproducibilidad). |
+| `--bootstrap-ic` | `False` | Activar bootstrap por cliente para IC95% en validación. |
+| `--n-bootstrap` | `1000` | Nº de iteraciones bootstrap para IC95%. |
 
 Ejemplos útiles:
 ```bash
@@ -159,6 +161,9 @@ python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_re
 
 # Validación walk-forward completa (4 folds, sin Optuna)
 python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission_candidata.csv --trials 0 --n-seeds 3 --folds 4 --modo-features estatico
+
+# Pipeline completo con Optuna, bootstrap IC y modo estático (producción)
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission_candidata.csv --trials 30 --n-seeds 3 --folds 4 --modo-features estatico --bootstrap-ic --n-bootstrap 1000
 ```
 
 ### Qué hace, paso a paso
