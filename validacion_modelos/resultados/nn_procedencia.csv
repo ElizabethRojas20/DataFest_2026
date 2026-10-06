@@ -1,0 +1,6 @@
+chequeo,valor,esperado
+filas X_train_nn (= ene-ago),80300.0,80300
+filas X_val_nn (= sep-nov),29800.0,29800
+max |transform(ene-ago) - X_train_nn|,0.0,0
+max |transform(sep-nov) - X_val_nn|,0.0,0
+scaler n_samples_seen_ (110100 = todo train),110100.0,80300

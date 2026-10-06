@@ -121,3 +121,6 @@ desktop.ini
 .vscode/
 *.swp
 *~
+
+# ---------- Claude / IDE ----------
+.claude/

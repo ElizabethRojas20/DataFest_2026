@@ -1,0 +1,3 @@
+modelo,n_oat,gini_centro,gini_min_oat,gini_max_oat,rango_oat,config_max_oat,config_min_oat,se_ref,robusto,rango_extendida,config_max_total,gini_max_total
+lgb_sup_sin_dui,9,0.2563687376496782,0.2539102861460124,0.25681769778973723,0.002907411643724822,oat_learning_rate_x2,oat_num_leaves_x0.5,0.0079503251958312,True,0.007403006929268319,oat_learning_rate_x2,0.25681769778973723
+catboost_sin_dui,7,0.2526886451376182,0.24590337871955775,0.254131106539307,0.008227727819749231,oat_depth_bajo,oat_learning_rate_alto,0.0079503251958312,False,,,

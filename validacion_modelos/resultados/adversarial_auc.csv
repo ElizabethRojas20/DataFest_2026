@@ -1,0 +1,10 @@
+comparacion,variables,auc_adversarial,n_ref,n_dic,top5
+nov_vs_dic,sin_dui,0.5005525199362042,9500,9900,"distancia_sucursal_km (0.10), antiguedad_direccion_meses (0.10), ratio_deuda_ingresos (0.10), dias_ultima_transaccion (0.10), ingresos (0.10)"
+nov_vs_dic,con_dui,0.5178108293460925,9500,9900,"dias_ultima_interaccion (0.23), dias_ultima_transaccion (0.10), ratio_deuda_ingresos (0.08), antiguedad_direccion_meses (0.07), distancia_sucursal_km (0.07)"
+nov_vs_dic,con_dui_e_indicador,0.532412062732589,9500,9900,"indicador_dui_igual_dut (0.20), dias_ultima_interaccion (0.17), ratio_deuda_ingresos (0.07), distancia_sucursal_km (0.06), antiguedad_direccion_meses (0.06)"
+ene-nov_vs_dic,sin_dui,0.5217937912274425,110100,9900,"dias_ultima_transaccion (0.10), ratio_deuda_ingresos (0.10), ingresos (0.10), distancia_sucursal_km (0.10), antiguedad_direccion_meses (0.09)"
+ene-nov_vs_dic,con_dui,0.7537563032688374,110100,9900,"dias_ultima_transaccion (0.38), dias_ultima_interaccion (0.27), ratio_deuda_ingresos (0.04), ingresos (0.04), distancia_sucursal_km (0.04)"
+ene-nov_vs_dic,con_dui_e_indicador,0.774554903714713,110100,9900,"indicador_dui_igual_dut (0.69), dias_ultima_interaccion (0.05), dias_ultima_transaccion (0.03), ratio_deuda_ingresos (0.03), ingresos (0.03)"
+ago-nov_vs_dic,sin_dui,0.5007898153428894,39850,9900,"ratio_deuda_ingresos (0.10), dias_ultima_transaccion (0.10), ingresos (0.10), distancia_sucursal_km (0.10), saldo_promedio (0.10)"
+ago-nov_vs_dic,con_dui,0.5940394154848357,39850,9900,"dias_ultima_interaccion (0.23), dias_ultima_transaccion (0.21), ratio_deuda_ingresos (0.06), distancia_sucursal_km (0.06), ingresos (0.06)"
+ago-nov_vs_dic,con_dui_e_indicador,0.6058037400352332,39850,9900,"indicador_dui_igual_dut (0.44), dias_ultima_interaccion (0.11), dias_ultima_transaccion (0.05), ratio_deuda_ingresos (0.05), antiguedad_direccion_meses (0.04)"
