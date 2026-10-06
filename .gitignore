@@ -1,7 +1,14 @@
 # ============================================================
 # .gitignore — DataFest: propensión de conversión
-# Regla general: en el repositorio va TODO (código, datos, modelos, resultados) para que el equipo vea todo.
+# Regla general: código, docs, modelos ligeros y resultados. Datos pesados y arrays .npy ignorados.
 # ============================================================
+
+# ---------- Datos pesados / confidenciales ----------
+datos_entrada/*.csv
+!datos_entrada/sample_submission.csv
+
+# ---------- Arrays numpy pesados ----------
+modelos/*.npy
 
 # ---------- Secretos y credenciales (NUNCA subir) ----------
 .env
@@ -63,61 +70,3 @@ desktop.ini
 
 # ---------- Claude / IDE ----------
 .claude/
-
-# ---------- Secretos y credenciales (NUNCA subir) ----------
-.env
-.env.*
-!.env.example
-*.pem
-*.key
-*.p12
-*.pfx
-credentials.json
-secrets.json
-secrets.yaml
-secrets.yml
-*.secret
-kaggle.json
-.kaggle/
-.aws/
-.ssh/
-
-# ---------- Optuna / bases de datos locales ----------
-*.db
-*.sqlite
-*.sqlite3
-optuna_*.log
-
-# ---------- Python ----------
-__pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-build/
-dist/
-.pytest_cache/
-.mypy_cache/
-.ruff_cache/
-.coverage
-htmlcov/
-
-# Entornos virtuales
-.venv/
-venv/
-env/
-ENV/
-
-# ---------- Jupyter / Colab ----------
-.ipynb_checkpoints/
-
-# ---------- Logs ----------
-*.log
-
-# ---------- Sistema operativo y editores ----------
-.DS_Store
-Thumbs.db
-desktop.ini
-.idea/
-.vscode/
-*.swp
-*~
