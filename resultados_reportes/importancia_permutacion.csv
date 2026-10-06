@@ -1,0 +1,11 @@
+feature,importance_mean,importance_std
+numero_productos,0.0577,0.002
+banda_riesgo_low,0.0452,0.003
+dias_ultima_transaccion,0.0421,0.002
+banda_riesgo_high,0.0267,0.003
+saldo_promedio,0.022,0.002
+ingresos,0.0201,0.002
+ratio_deuda_ingresos,0.0198,0.002
+distancia_sucursal_km,0.0184,0.001
+antiguedad_cuenta_meses,0.0182,0.001
+edad,0.0177,0.001
