@@ -1,5 +1,7 @@
 # Informe Final - DataFest 2026: Propensión de Conversión de Clientes
 
+> **Aviso (7 oct 2026):** este informe es **anterior a la auditoría de octubre**. Sus cifras de Gini se calcularon con el pipeline antiguo, que elegía al ganador con un solo mes y paraba el entrenamiento casi al azar. Los resultados vigentes, el modelo nuevo (LightGBM superficial, Gini medio 0,2540) y las correcciones están en [`docs/RESUMEN_DE_CAMBIOS.md`](docs/RESUMEN_DE_CAMBIOS.md), en el [`README.md`](README.md) y en los informes de [`validacion_modelos/`](validacion_modelos/).
+
 ---
 
 ## 1. Resumen Ejecutivo
