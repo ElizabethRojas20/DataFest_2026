@@ -21,9 +21,11 @@ Decisiones de diseño para evitar data leakage
   test nunca se usa.
 * El Target Encoding de una fila del mes M se calcula únicamente con los objetivos de meses < M
   (media acumulada suavizada). Para test se usan todos los meses de train.
-* La validación es TEMPORAL (últimos N meses de train; por defecto 3 ≈ 73/27 en filas), no un
-  ``train_test_split`` aleatorio: el test es un mes futuro y un mismo cliente aparece en varios
-  meses con casi todas sus variables fijas, lo que inflaría la métrica con una partición aleatoria.
+* La validación es TEMPORAL (walk-forward: cada uno de los últimos N meses de train es un fold;
+  por defecto 4), no un ``train_test_split`` aleatorio: el test es un mes futuro y un mismo cliente
+  aparece en varios meses con casi todas sus variables fijas, lo que inflaría la métrica.
+* El nº de árboles no se elige con early stopping sobre el mes evaluado: el Gini de cada fold usa
+  el nº elegido con los demás folds (ver ``EvaluadorModelos``).
 * La selección de variables se ajusta solo con los meses de entrenamiento, de modo que la métrica
   de validación sea una estimación honesta.
 * No se usan ``id_cliente`` ni ``mes`` como predictoras (diciembre es un mes no visto).
@@ -93,6 +95,11 @@ class Config:
         "tiene_prestamo", "tiene_seguro"])
     cols_categoricas: List[str] = field(default_factory=lambda: [
         "ocupacion", "region", "canal_adquisicion", "banda_riesgo", "dispositivo_principal"])
+    # Columnas que se quitan de X (y sus derivadas "{col}_*"). Vacío por defecto para que los
+    # scripts de verificaciones/ y validacion_modelos/ que usan Config() sigan igual; la CLI
+    # excluye dias_ultima_interaccion (copia degradada de dias_ultima_transaccion en ene–nov y
+    # permutación sin señal en diciembre; ver validacion_modelos/INFORME_VALIDACION.md §4.3).
+    cols_excluir: List[str] = field(default_factory=list)
 
     # Variables con rezagos y ventanas móviles
     cols_lag: List[str] = field(default_factory=lambda: [
@@ -122,8 +129,12 @@ class Config:
     n_trials_optuna: int = 30
     n_seeds_final: int = 3
     seed: int = 42
-    bootstrap_ic: bool = False            # P-9: activar bootstrap IC95% en validación
-    n_bootstrap: int = 1000               # P-9: nº de iteraciones bootstrap
+    # Nº de árboles: cada fold se entrena sin early stopping hasta max(grid) y se mide el Gini en
+    # cada punto de la rejilla; el nº se elige con la curva media de los folds (regla 1-SE).
+    grid_arboles: Tuple[int, ...] = (25, 50, 75, 100, 150, 200, 300, 400, 600, 800)
+    bootstrap_ic: bool = False            # legacy: el IC95% se calcula siempre
+    n_bootstrap: int = 500                # réplicas del bootstrap de clientes (SE e IC95%)
+    n_bootstrap_optuna: int = 100         # réplicas por trial de Optuna (solo para la regla 1-SE)
 
 
 # =============================================================================
@@ -357,6 +368,11 @@ def construir_dataset(train: pd.DataFrame, test: pd.DataFrame, cfg: Config) -> D
         df[cfg.cols_numericas].astype("float32"),
         df[cfg.cols_booleanas].astype("int8"),
         temporales, ohe, te], axis=1)
+    if cfg.cols_excluir:
+        quitar = [c for c in X.columns
+                  if any(c == e or c.startswith(f"{e}_") for e in cfg.cols_excluir)]
+        X = X.drop(columns=quitar)
+        log.info("Columnas excluidas: %s", quitar)
     es_test = df["_es_test"].to_numpy()
     y = df.loc[~es_test, cfg.target].astype("int8")
     mes_train = df.loc[~es_test, cfg.mes_col].to_numpy()
@@ -525,6 +541,10 @@ PARAMS_DEFECTO: Dict[str, dict] = {
                      subsample_freq=1, colsample_bytree=0.7, reg_lambda=5.0),
     "lightgbm_sin_regularizar": dict(learning_rate=0.03, num_leaves=31, min_child_samples=50, subsample=0.8,
                                       subsample_freq=1, colsample_bytree=0.7, reg_lambda=1.0),
+    # Árboles poco profundos: con señal débil la curva Gini-vs-árboles es una meseta ancha y el nº
+    # de árboles deja de importar (= lgb_sup_sin_dui de validacion_modelos/INFORME_ROBUSTEZ.md R1-R3).
+    "lightgbm_superficial": dict(learning_rate=0.03, num_leaves=8, min_child_samples=200, subsample=0.7,
+                                 subsample_freq=1, colsample_bytree=0.8, reg_lambda=10.0),
     "xgboost": dict(learning_rate=0.03, max_depth=6, min_child_weight=5, subsample=0.8,
                     colsample_bytree=0.7, reg_lambda=1.0),
     "catboost": dict(learning_rate=0.05, depth=6, l2_leaf_reg=3.0, bootstrap_type="Bernoulli",
@@ -532,6 +552,8 @@ PARAMS_DEFECTO: Dict[str, dict] = {
     "random_forest": dict(n_estimators=300, min_samples_leaf=20, max_features="sqrt",
                           max_samples=0.7),
 }
+# El pipeline ya no usa early stopping (ver EvaluadorModelos); se mantienen porque los scripts de
+# validacion_modelos/ los importan.
 ROUNDS_MAX = 2000        # tope de árboles con early stopping
 ES_ROUNDS = 100
 
@@ -564,29 +586,114 @@ def construir_modelo(familia: str, params: dict, n_iter: int, seed: int, early_s
     raise ValueError(f"Familia desconocida: {familia}")
 
 
+class GiniPonderado:
+    """
+    Gini exacto con pesos por fila: igual a ``2*roc_auc_score(y, p, sample_weight=w) - 1``
+    (empates = 1/2). Ordena ``p`` una sola vez y cada evaluación con pesos nuevos es O(n), lo que
+    hace barato el bootstrap de clientes.
+    """
+
+    def __init__(self, y, p):
+        y = np.asarray(y, dtype=float)
+        p = np.asarray(p, dtype=float)
+        self.orden = np.argsort(p, kind="mergesort")
+        ps = p[self.orden]
+        self.ys = y[self.orden]
+        self.grupo = np.r_[0, np.cumsum(ps[1:] != ps[:-1])]     # grupos de scores empatados
+        self.n_grupos = int(self.grupo[-1]) + 1
+
+    def __call__(self, w: Optional[np.ndarray] = None) -> float:
+        w = np.ones(len(self.ys)) if w is None else np.asarray(w, dtype=float)[self.orden]
+        wp = np.bincount(self.grupo, w * self.ys, self.n_grupos)
+        wn = np.bincount(self.grupo, w * (1 - self.ys), self.n_grupos)
+        neg_antes = np.cumsum(wn) - wn
+        auc = np.sum(wp * (neg_antes + 0.5 * wn)) / (wp.sum() * wn.sum())
+        return float(2 * auc - 1)
+
+
+def conteos_bootstrap_clientes(ids: np.ndarray, n_boot: int,
+                               seed: int) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Bootstrap de clientes CON reemplazo. Devuelve ``(conteos, inv)``: el peso de la fila i en la
+    réplica b es ``conteos[b, inv[i]]``, el nº de veces que salió su cliente. Un cliente sorteado
+    dos veces pesa 2 en todas sus filas; uno no sorteado pesa 0.
+    """
+    rng = np.random.default_rng(seed)
+    uniq, inv = np.unique(ids, return_inverse=True)
+    conteos = np.stack([np.bincount(rng.integers(0, len(uniq), len(uniq)), minlength=len(uniq))
+                        for _ in range(n_boot)]).astype(np.int16)
+    return conteos, inv
+
+
+def elegir_n_1se(gini_folds: np.ndarray, boot_folds: np.ndarray) -> int:
+    """
+    Índice de la rejilla de árboles elegido con la regla 1-SE sobre la curva media de los folds.
+
+    gini_folds : (K, G) Gini de cada fold en cada punto de la rejilla.
+    boot_folds : (B, K, G) el mismo Gini en cada réplica bootstrap (pesos de clientes compartidos).
+    Se toma el n más pequeño cuya media no esté más de 1 SE pareado por debajo de la mejor: si dos
+    n no se distinguen del ruido, se prefiere el modelo más simple.
+    """
+    media = gini_folds.mean(axis=0)
+    g_mejor = int(np.argmax(media))
+    media_boot = boot_folds.mean(axis=1)                              # (B, G)
+    se = (media_boot - media_boot[:, [g_mejor]]).std(axis=0, ddof=1)  # SE pareado frente al mejor
+    return int(np.flatnonzero(media >= media[g_mejor] - se)[0])
+
+
+def predecir_rejilla(familia: str, modelo, X: pd.DataFrame, grid: Sequence[int]) -> np.ndarray:
+    """Predicciones del mismo modelo usando solo sus primeros n árboles, para cada n de ``grid``."""
+    if familia == "lightgbm":
+        return np.stack([modelo.predict_proba(X, num_iteration=n)[:, 1] for n in grid])
+    if familia == "xgboost":
+        return np.stack([modelo.predict_proba(X, iteration_range=(0, n))[:, 1] for n in grid])
+    if familia == "catboost":
+        return np.stack([modelo.predict_proba(X, ntree_end=n)[:, 1] for n in grid])
+    if familia == "random_forest":
+        return modelo.predict_proba(X)[:, 1][None, :]
+    raise ValueError(f"Familia desconocida: {familia}")
+
+
 class EvaluadorModelos:
     """
-    Entrena y evalúa LightGBM, XGBoost, CatBoost y RandomForest con validación walk-forward
-    (P-3: 4 folds temporales). Reporta AUC y Gini promediados entre folds.
+    Compara LightGBM, XGBoost, CatBoost y RandomForest con validación walk-forward: cada uno de
+    los últimos ``n_folds`` meses de train es un fold y se entrena con todos los meses anteriores.
 
-    Cada fold usa un mes de validación distinto (últimos 4 meses de train), entrenando con
-    todos los meses anteriores. Esto imita la situación real y evita leakage de clientes.
-    ``optimizar_lightgbm`` ajusta hiperparámetros con Optuna y se reporta como fila aparte
-    ("LightGBM_Optuna") para que la comparación sea transparente.
+    Nº de árboles, sin early stopping sobre el mes evaluado:
+      1. En cada fold el modelo se entrena hasta ``max(grid_arboles)`` árboles y se mide el Gini del
+         mes validado en cada punto de la rejilla (predicciones por etapas del mismo modelo).
+      2. Gini honesto del fold k: n se elige con la regla 1-SE sobre la curva media de los DEMÁS
+         folds y se lee la curva de k en ese n, así que el objetivo del mes k no decide su propio n.
+         Los demás folds incluyen meses posteriores a k; se usan solo para fijar un hiperparámetro.
+      3. Nº de árboles final: regla 1-SE sobre la curva media de todos los folds.
+
+    El resumen da el Gini medio de los folds, el peor fold y un IC95% por bootstrap de clientes con
+    reemplazo. El remuestreo es el mismo para todos los modelos, así que sus diferencias son pareadas.
     """
 
     def __init__(self, X_train: pd.DataFrame, y_train: pd.Series,
                  mes_train: np.ndarray, id_train: np.ndarray, cfg: Config):
         self.X_train, self.y_train = X_train, y_train
-        self.mes_train = mes_train
-        self.id_train = id_train
-        self.n_folds = cfg.n_folds
-        self.bootstrap_ic = cfg.bootstrap_ic
-        self.n_bootstrap = cfg.n_bootstrap
+        self.mes_train, self.id_train = mes_train, id_train
+        self.grid = tuple(sorted(cfg.grid_arboles))
+        self.n_bootstrap = max(2, cfg.n_bootstrap)
+        self.n_bootstrap_optuna = max(2, cfg.n_bootstrap_optuna)
         self.seed = cfg.seed
         self.params = {k: dict(v) for k, v in PARAMS_DEFECTO.items()}
-        self.modelos_: Dict[str, List[object]] = {}  # lista de modelos por fold
-        self.resultados_: Dict[str, List[dict]] = {}  # resultados por fold
+        self.meses_val = np.sort(np.unique(mes_train))[-cfg.n_folds:]
+        self.mascaras_ = [(mes_train < m, mes_train == m) for m in self.meses_val]
+
+        # Pesos bootstrap de las filas de validación de todos los folds a la vez: un cliente
+        # sorteado entra con sus filas de todos los meses validados.
+        es_val = np.isin(mes_train, self.meses_val)
+        self.conteos_, inv = conteos_bootstrap_clientes(
+            id_train[es_val], max(self.n_bootstrap, self.n_bootstrap_optuna), cfg.seed)
+        pos = np.cumsum(es_val) - 1                     # posición de cada fila dentro de es_val
+        self.inv_folds_ = [inv[pos[va]] for _, va in self.mascaras_]
+
+        # Más datos en el modelo final -> algo más de árboles (filas totales / filas medias por fold)
+        self.factor_datos_ = len(y_train) / np.mean([tr.sum() for tr, _ in self.mascaras_])
+        self.resultados_: Dict[str, dict] = {}
         self.val_predictions_: List[pd.DataFrame] = []  # P-11: predicciones de validación para auditoría
 
     # ---- utilidades ---------------------------------------------------------
@@ -596,142 +703,91 @@ class EvaluadorModelos:
         auc = roc_auc_score(y_true, y_prob)
         return auc, 2 * auc - 1
 
-    def _registrar(self, nombre: str, familia: str, modelo, params: dict, mejor_iter: int,
-                   auc: float, gini: float) -> dict:
-        self.modelos_.setdefault(nombre, []).append(modelo)
-        self.resultados_.setdefault(nombre, []).append(
-            dict(familia=familia, auc=auc, gini=gini, mejor_iter=mejor_iter, params=params))
-        log.info("%-14s AUC=%.4f | Gini=%.4f | iter=%s", nombre, auc, gini, mejor_iter)
-        return self.resultados_[nombre][-1]
+    def _curvas(self, familia: str, params: dict, n_boot: int):
+        """
+        Entrena un modelo por fold y devuelve ``(grid, preds, gini, boot)``:
+        preds[k] (G, n_k) predicciones del fold k en cada n; gini (K, G); boot (B, K, G).
+        """
+        grid = (int(params["n_estimators"]),) if familia == "random_forest" else self.grid
+        K, G = len(self.mascaras_), len(grid)
+        preds, gini, boot = [], np.empty((K, G)), np.empty((n_boot, K, G))
+        for k, (tr, va) in enumerate(self.mascaras_):
+            m = construir_modelo(familia, params, max(grid), self.seed)
+            m.fit(self.X_train.loc[tr], self.y_train.loc[tr])
+            p = predecir_rejilla(familia, m, self.X_train.loc[va], grid)
+            y_va = self.y_train.loc[va].to_numpy()
+            pesos = self.conteos_[:n_boot, self.inv_folds_[k]]
+            for g in range(G):
+                f = GiniPonderado(y_va, p[g])
+                gini[k, g] = f()
+                boot[:, k, g] = [f(w) for w in pesos]
+            preds.append(p)
+            del m
+        return grid, preds, gini, boot
 
-    def _entrenar_en_fold(self, familia: str, params: dict, nombre: str,
-                          X_tr: pd.DataFrame, y_tr: pd.Series,
-                          X_val: pd.DataFrame, y_val: pd.Series,
-                          ids_val: Optional[np.ndarray] = None,
-                          mes_val: Optional[np.ndarray] = None,
-                          fold_num: Optional[int] = None) -> dict:
-        """Entrena un modelo en un fold y devuelve métricas."""
-        if familia == "lightgbm":
-            m = construir_modelo("lightgbm", params, ROUNDS_MAX, self.seed)
-            m.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], eval_metric="auc",
-                  callbacks=[lgb.early_stopping(ES_ROUNDS, verbose=False)])
-            prob = m.predict_proba(X_val)[:, 1]
-            mejor_iter = int(m.best_iteration_)
-        elif familia == "xgboost":
-            m = construir_modelo("xgboost", params, ROUNDS_MAX, self.seed, early_stopping=True)
-            m.fit(X_tr, y_tr, eval_set=[(X_val, y_val)], verbose=False)
-            prob = m.predict_proba(X_val)[:, 1]
-            mejor_iter = int(m.best_iteration) + 1
-        elif familia == "catboost":
-            m = construir_modelo("catboost", params, ROUNDS_MAX, self.seed, early_stopping=True)
-            m.fit(X_tr, y_tr, eval_set=(X_val, y_val))
-            prob = m.predict_proba(X_val)[:, 1]
-            mejor_iter = int(m.get_best_iteration()) + 1
-        elif familia == "random_forest":
-            m = construir_modelo("random_forest", params, 0, self.seed)
-            m.fit(X_tr, y_tr)
-            prob = m.predict_proba(X_val)[:, 1]
-            mejor_iter = params["n_estimators"]
-        else:
-            raise ValueError(f"Familia desconocida: {familia}")
+    def _evaluar_modelo_cv(self, familia: str, params: dict, nombre: str,
+                           registrar: bool = True, n_boot: Optional[int] = None) -> dict:
+        """Walk-forward con elección honesta del nº de árboles (ver docstring de la clase)."""
+        n_boot = n_boot or self.n_bootstrap
+        grid, preds, gini, boot = self._curvas(familia, params, n_boot)
+        K = len(self.meses_val)
+        if K == 1:
+            log.warning("Con 1 fold, el nº de árboles se elige con el mismo mes evaluado: "
+                        "el Gini de %s es optimista", nombre)
+        g_fold = []
+        for k in range(K):
+            otros = [j for j in range(K) if j != k] or [k]
+            g_fold.append(elegir_n_1se(gini[otros], boot[:, otros]))
+        gini_fold = np.array([gini[k, g] for k, g in enumerate(g_fold)])
+        gini_boot = np.mean([boot[:, k, g] for k, g in enumerate(g_fold)], axis=0)  # (B,)
+        g_final = elegir_n_1se(gini, boot)
 
-        auc, gini = self.metricas(y_val, prob)
+        res = dict(familia=familia, params=params,
+                   auc=float(np.mean((gini_fold + 1) / 2)), gini=float(gini_fold.mean()),
+                   gini_peor_fold=float(gini_fold.min()),
+                   gini_ic_lower=float(np.percentile(gini_boot, 2.5)),
+                   gini_ic_upper=float(np.percentile(gini_boot, 97.5)),
+                   mejor_iter=int(grid[g_final]),
+                   arboles_folds=[int(grid[g]) for g in g_fold],
+                   gini_folds=gini_fold.tolist(), gini_boot=gini_boot,
+                   curva=pd.Series(gini.mean(axis=0), index=list(grid)))
+        if not registrar:
+            return res
 
-        # P-11: Guardar predicciones de validación para auditoría
-        if ids_val is not None and mes_val is not None and fold_num is not None:
-            df_pred = pd.DataFrame({
-                "id_cliente": ids_val,
-                "mes": mes_val,
-                "y_true": y_val.values,
-                "y_prob": prob,
-                "modelo": nombre,
-                "fold": fold_num
-            })
-            self.val_predictions_.append(df_pred)
+        for k, mes in enumerate(self.meses_val):
+            log.info("  %-24s fold %d (mes %d): Gini=%.4f con %d árboles",
+                     nombre, k + 1, mes, gini_fold[k], grid[g_fold[k]])
+            va = self.mascaras_[k][1]
+            self.val_predictions_.append(pd.DataFrame({
+                "id_cliente": self.id_train[va], "mes": self.mes_train[va],
+                "y_true": self.y_train.loc[va].to_numpy(), "y_prob": preds[k][g_fold[k]],
+                "modelo": nombre, "fold": k + 1}))
+        log.info("%-24s Gini medio=%.4f [IC95 %.4f; %.4f] | peor fold=%.4f | árboles finales=%d",
+                 nombre, res["gini"], res["gini_ic_lower"], res["gini_ic_upper"],
+                 res["gini_peor_fold"], res["mejor_iter"])
+        self.resultados_[nombre] = res
+        return res
 
-        return self._registrar(nombre, familia, m, params, mejor_iter, auc, gini)
-
-    def _evaluar_modelo_cv(self, familia: str, params: dict, nombre: str) -> List[dict]:
-        """Ejecuta walk-forward CV para un modelo."""
-        meses_unicos = np.sort(np.unique(self.mes_train))
-        # Usar los últimos n_folds meses como validación (uno por fold)
-        meses_val = meses_unicos[-self.n_folds:]
-        resultados_fold = []
-
-        for i, mes_corte in enumerate(meses_val):
-            log.info("  Fold %d/%d: validando mes %d", i + 1, self.n_folds, mes_corte)
-            es_val = self.mes_train == mes_corte
-            es_tr = self.mes_train < mes_corte
-            if es_tr.sum() == 0 or es_val.sum() == 0:
-                log.warning("Fold %d saltado: train=%d val=%d", i + 1, es_tr.sum(), es_val.sum())
-                continue
-            res = self._entrenar_en_fold(familia, params, nombre,
-                                         self.X_train.loc[es_tr], self.y_train.loc[es_tr],
-                                         self.X_train.loc[es_val], self.y_train.loc[es_val],
-                                         self.id_train[es_val],
-                                         self.mes_train[es_val],
-                                         i + 1)  # P-11: fold number para auditoría
-            resultados_fold.append(res)
-
-        # P-9: Bootstrap IC95% por cliente (si activado)
-        if self.bootstrap_ic and resultados_fold:
-            # Usar predicciones del último fold (más representativo, más datos de train)
-            # En producción se haría OOF completo; esto es aproximación
-            ultimo_fold = resultados_fold[-1]
-            # Necesitamos re-entrenar para obtener predicciones del último fold
-            # (simplificación: ya las tenemos en el modelo guardado)
-            modelo_ultimo = self.modelos_[nombre][-1]
-            es_val_ultimo = self.mes_train == meses_val[-1]
-            y_val = self.y_train.loc[es_val_ultimo]
-            y_prob = modelo_ultimo.predict_proba(self.X_train.loc[es_val_ultimo])[:, 1]
-            ids_val = self.id_train[es_val_ultimo]
-            ic_lower, ic_upper = self.bootstrap_ic_cliente(y_val.to_numpy(), y_prob, ids_val,
-                                                            n_bootstrap=self.n_bootstrap, seed=self.seed)
-            # Añadir IC al último resultado (el que se usa para resumen)
-            resultados_fold[-1]["gini_ic_lower"] = ic_lower
-            resultados_fold[-1]["gini_ic_upper"] = ic_upper
-            log.info("  Bootstrap IC95%% (Gini): [%.4f, %.4f]", ic_lower, ic_upper)
-
-        return resultados_fold
-
-    # ---- entrenadores (ahora usan CV) ---------------------------------------
+    # ---- entrenadores ---------------------------------------------------------
     def entrenar_lightgbm(self, params: Optional[dict] = None, nombre: str = "LightGBM") -> dict:
-        params = params or self.params["lightgbm"]
-        resultados = self._evaluar_modelo_cv("lightgbm", params, nombre)
-        # Devolver el promedio (para tabla resumen)
-        return dict(familia="lightgbm", auc=np.mean([r["auc"] for r in resultados]),
-                    gini=np.mean([r["gini"] for r in resultados]),
-                    mejor_iter=int(np.mean([r["mejor_iter"] for r in resultados])),
-                    params=params, _fold_results=resultados)
+        return self._evaluar_modelo_cv("lightgbm", params or self.params["lightgbm"], nombre)
 
     def entrenar_xgboost(self, params: Optional[dict] = None, nombre: str = "XGBoost") -> dict:
-        params = params or self.params["xgboost"]
-        resultados = self._evaluar_modelo_cv("xgboost", params, nombre)
-        return dict(familia="xgboost", auc=np.mean([r["auc"] for r in resultados]),
-                    gini=np.mean([r["gini"] for r in resultados]),
-                    mejor_iter=int(np.mean([r["mejor_iter"] for r in resultados])),
-                    params=params, _fold_results=resultados)
+        return self._evaluar_modelo_cv("xgboost", params or self.params["xgboost"], nombre)
 
     def entrenar_catboost(self, params: Optional[dict] = None, nombre: str = "CatBoost") -> dict:
-        params = params or self.params["catboost"]
-        resultados = self._evaluar_modelo_cv("catboost", params, nombre)
-        return dict(familia="catboost", auc=np.mean([r["auc"] for r in resultados]),
-                    gini=np.mean([r["gini"] for r in resultados]),
-                    mejor_iter=int(np.mean([r["mejor_iter"] for r in resultados])),
-                    params=params, _fold_results=resultados)
+        return self._evaluar_modelo_cv("catboost", params or self.params["catboost"], nombre)
 
     def entrenar_random_forest(self, params: Optional[dict] = None,
                                nombre: str = "RandomForest") -> dict:
-        params = params or self.params["random_forest"]
-        resultados = self._evaluar_modelo_cv("random_forest", params, nombre)
-        return dict(familia="random_forest", auc=np.mean([r["auc"] for r in resultados]),
-                    gini=np.mean([r["gini"] for r in resultados]),
-                    mejor_iter=int(np.mean([r["mejor_iter"] for r in resultados])),
-                    params=params, _fold_results=resultados)
+        return self._evaluar_modelo_cv("random_forest", params or self.params["random_forest"],
+                                       nombre)
 
     # ---- Optuna -------------------------------------------------------------
     def optimizar_lightgbm(self, n_trials: int = 30, log_path: Optional[Path] = None) -> dict:
-        """Busca hiperparámetros de LightGBM maximizando el AUC medio en CV walk-forward.
+        """Busca hiperparámetros de LightGBM maximizando el Gini medio honesto del walk-forward.
+        Los trials no se registran en ``resultados_``. El Gini de "LightGBM_Optuna" sigue siendo
+        optimista: la búsqueda elige entre muchos candidatos con los mismos folds.
         P-12: Logging estructurado JSONL de trials de Optuna.
         """
         def objetivo(trial: optuna.Trial) -> float:
@@ -744,24 +800,22 @@ class EvaluadorModelos:
                 colsample_bytree=trial.suggest_float("colsample_bytree", 0.4, 1.0),
                 reg_alpha=trial.suggest_float("reg_alpha", 1e-3, 10.0, log=True),
                 reg_lambda=trial.suggest_float("reg_lambda", 1e-3, 10.0, log=True))
-            # Evaluar en CV walk-forward (usar menos folds para velocidad en Optuna)
-            resultados = self._evaluar_modelo_cv("lightgbm", p, "Optuna_Trial")
-            auc_mean = np.mean([r["auc"] for r in resultados])
-            gini_mean = np.mean([r["gini"] for r in resultados])
+            res = self._evaluar_modelo_cv("lightgbm", p, "Optuna_Trial", registrar=False,
+                                          n_boot=self.n_bootstrap_optuna)
 
             # P-12: Log JSONL
             if log_path:
                 log_entry = {
                     "trial": trial.number,
                     "params": p,
-                    "auc_mean": auc_mean,
-                    "gini_mean": gini_mean,
+                    "auc_mean": res["auc"],
+                    "gini_mean": res["gini"],
                     "timestamp": time.time()
                 }
                 with open(log_path, "a", encoding="utf-8") as f:
                     f.write(json.dumps(log_entry) + "\n")
 
-            return auc_mean
+            return res["gini"]
 
         # P-12: Callback para logging automático
         def log_callback(study: optuna.Study, trial: optuna.Trial):
@@ -781,16 +835,17 @@ class EvaluadorModelos:
         callbacks = [log_callback] if log_path else None
         estudio.optimize(objetivo, n_trials=n_trials, show_progress_bar=False, callbacks=callbacks)
         mejor = dict(estudio.best_params, subsample_freq=1)
-        log.info("Optuna: mejor AUC medio CV=%.4f en %d trials", estudio.best_value, n_trials)
+        log.info("Optuna: mejor Gini medio CV=%.4f en %d trials", estudio.best_value, n_trials)
         return mejor
 
     # ---- orquestación -------------------------------------------------------
     def evaluar_todos(self, n_trials_optuna: int = 0) -> pd.DataFrame:
-        """Entrena los cuatro modelos (y Optuna si n_trials_optuna > 0) con walk-forward CV.
+        """Evalúa todos los modelos (y Optuna si n_trials_optuna > 0) con walk-forward CV.
         P-10: Comparación obligatoria LightGBM_regularizado vs LightGBM_sin_regularizar.
         """
         self.entrenar_lightgbm(nombre="LightGBM_Regularizado")  # usa params["lightgbm"] (regularizado)
         self.entrenar_lightgbm(self.params["lightgbm_sin_regularizar"], nombre="LightGBM_Sin_Regularizar")
+        self.entrenar_lightgbm(self.params["lightgbm_superficial"], nombre="LightGBM_Superficial")
         self.entrenar_xgboost()
         self.entrenar_catboost()
         self.entrenar_random_forest()
@@ -800,58 +855,19 @@ class EvaluadorModelos:
             self.entrenar_lightgbm(mejor, nombre="LightGBM_Optuna")
         return self.resumen()
 
-    @staticmethod
-    def bootstrap_ic_cliente(y_true: np.ndarray, y_prob: np.ndarray,
-                             ids: np.ndarray, n_bootstrap: int = 1000,
-                             alpha: float = 0.05, seed: int = 42) -> Tuple[float, float]:
-        """
-        Bootstrap por cliente (P-4) para IC95% honesto del Gini.
-        Remuestrea clientes (no filas) para preservar estructura de panel.
-        """
-        rng = np.random.default_rng(seed)
-        clientes_unicos = np.unique(ids)
-        n_clientes = len(clientes_unicos)
-        ginis_boot = []
-
-        for _ in range(n_bootstrap):
-            # Remuestreo de clientes con reemplazo
-            cliente_sample = rng.choice(clientes_unicos, size=n_clientes, replace=True)
-            # Construir máscara de filas pertenecientes a clientes muestreados
-            mask = np.isin(ids, cliente_sample)
-            if mask.sum() == 0:
-                continue
-            y_true_masked = y_true[mask]
-            y_prob_masked = y_prob[mask]
-            # Verificar que hay ambas clases
-            if len(np.unique(y_true_masked)) < 2:
-                continue
-            try:
-                auc = roc_auc_score(y_true_masked, y_prob_masked)
-                ginis_boot.append(2 * auc - 1)
-            except ValueError:
-                continue
-
-        if len(ginis_boot) < 10:
-            return np.nan, np.nan
-        lower = np.percentile(ginis_boot, 100 * alpha / 2)
-        upper = np.percentile(ginis_boot, 100 * (1 - alpha / 2))
-        return float(lower), float(upper)
-
     def resumen(self) -> pd.DataFrame:
-        """Tabla con AUC, Gini, nº de iteraciones e IC95% (bootstrap por cliente), ordenada por Gini."""
+        """
+        Tabla por modelo, ordenada por Gini medio de los folds: AUC y Gini medios, peor fold, IC95%,
+        nº de árboles del modelo final (``mejor_iter``), árboles por fold y Gini de cada mes.
+        """
         filas = {}
-        for nombre, resultados in self.resultados_.items():
-            if not resultados:
-                continue
-            # El último resultado ya tiene los promedios (ver entrenar_*)
-            r = resultados[-1]
-            filas[nombre] = {k: r[k] for k in ("auc", "gini", "mejor_iter")}
-            # Añadir IC95% si hay datos de fold disponibles
-            if "_fold_results" in r and r["_fold_results"]:
-                # Para IC usamos predicciones del último fold (más representativo)
-                # Nota: en producción se haría bootstrap sobre predicciones OOF completas
-                pass
-        tabla = pd.DataFrame(filas).T
+        for nombre, r in self.resultados_.items():
+            fila = {k: r[k] for k in ("auc", "gini", "gini_peor_fold", "gini_ic_lower",
+                                      "gini_ic_upper", "mejor_iter")}
+            fila["arboles_folds"] = "/".join(map(str, r["arboles_folds"]))
+            fila.update({f"gini_{mes}": g for mes, g in zip(self.meses_val, r["gini_folds"])})
+            filas[nombre] = fila
+        tabla = pd.DataFrame.from_dict(filas, orient="index")
         return tabla.sort_values("gini", ascending=False)
 
 
@@ -864,8 +880,9 @@ def entrenar_y_predecir_final(familia: str, params: dict, mejor_iter: int,
     """
     Reentrena el modelo ganador con el 100 % de train y predice test.
 
-    * Boosting: n_iter = factor_datos * mejor_iter, donde factor_datos = filas totales / filas
-      de entrenamiento de la validación (más datos admiten algo más de árboles).
+    * Boosting: n_iter = factor_datos * mejor_iter, donde mejor_iter sale de la regla 1-SE sobre
+      la curva media de los folds y factor_datos = filas totales / filas medias de entrenamiento
+      por fold (``EvaluadorModelos.factor_datos_``; más datos admiten algo más de árboles).
     * Se promedian ``n_seeds`` semillas para estabilizar el ranking.
     """
     n_iter = max(10, int(round(mejor_iter * factor_datos)))
@@ -916,8 +933,6 @@ def main(cfg: Config) -> None:
     if not 1 <= cfg.n_folds < len(meses):
         raise ValueError(f"n_folds debe estar entre 1 y {len(meses) - 1}")
     log.info("Walk-forward CV: %d folds, meses de validación: %s", cfg.n_folds, meses[-cfg.n_folds:])
-    # factor_datos para escalar nº de árboles al final (promedio sobre folds)
-    factor_datos = len(datos.mes_train) / (len(datos.mes_train) - len(datos.mes_train) * 0.25)  # aprox
 
     # 3) Selección de variables (SOLO con datos de entrenamiento del primer fold = todos menos último mes)
     # Usamos una selección preliminar con el 75% más antiguo para no hacer leakage
@@ -933,12 +948,13 @@ def main(cfg: Config) -> None:
 
     # 5) Modelo ganador -> entrenamiento con el 100 % de train -> predicción de test
     ganador = tabla.index[0]
-    r = ev.resultados_[ganador][-1]  # último fold tiene los promedios
-    log.info("Modelo ganador: %s (Gini medio=%.4f)", ganador, r["gini"])
+    r = ev.resultados_[ganador]
+    log.info("Modelo ganador: %s (Gini medio=%.4f | peor fold=%.4f | %d árboles en CV x %.2f)",
+             ganador, r["gini"], r["gini_peor_fold"], r["mejor_iter"], ev.factor_datos_)
     pred = entrenar_y_predecir_final(
         r["familia"], r["params"], int(r["mejor_iter"]),
         datos.X_train[features], datos.y_train, datos.X_test[features],
-        cfg.n_seeds_final, cfg.seed, factor_datos)
+        cfg.n_seeds_final, cfg.seed, ev.factor_datos_)
     exportar_submission(datos.id_test, pred, cfg)
 
     # P-11: Guardar predicciones de validación para auditoría
@@ -952,6 +968,11 @@ def main(cfg: Config) -> None:
     carpeta = cfg.ruta_salida.parent
     tabla.to_csv(carpeta / "resultados_validacion_DF_WCB.csv")
     (carpeta / "features_seleccionadas_DF_WCB.txt").write_text("\n".join(features), encoding="utf-8")
+    # Réplicas bootstrap reales del Gini medio del ganador (fig9) y curvas Gini-vs-árboles
+    pd.DataFrame({"gini_bootstrap": r["gini_boot"]}).to_csv(carpeta / "bootstrap_gini.csv", index=False)
+    curvas = pd.concat({n: res["curva"] for n, res in ev.resultados_.items()
+                        if res["familia"] != "random_forest"}, names=["modelo", "n_arboles"])
+    curvas.rename("gini_medio_folds").to_csv(carpeta / "curvas_arboles_DF_WCB.csv")
     log.info("Pipeline completo en %.1f min", (time.time() - t0) / 60)
 
 
@@ -972,11 +993,17 @@ if __name__ == "__main__":
     ap.add_argument("--modo-features", choices=["estatico", "temporal"], default="estatico",
                     help="Modo de variables: 'estatico' (solo originales + OHE + dias_ultima_interaccion actual) o 'temporal' (lags/deltas/rolling)")
     ap.add_argument("--bootstrap-ic", action="store_true", default=False,
-                    help="Activar bootstrap por cliente para IC95% en validación (P-9)")
-    ap.add_argument("--n-bootstrap", type=int, default=1000,
-                    help="Nº de iteraciones bootstrap para IC95% (default: 1000)")
+                    help="[legacy, sin efecto] el IC95%% por bootstrap de clientes se calcula siempre")
+    ap.add_argument("--n-bootstrap", type=int, default=500,
+                    help="réplicas del bootstrap de clientes para SE (regla 1-SE) e IC95%% (default: 500)")
+    ap.add_argument("--grid-arboles", type=int, nargs="+", default=list(Config.grid_arboles),
+                    help="rejilla de nº de árboles donde se mide la curva Gini (máx. = árboles por fold)")
+    ap.add_argument("--excluir", nargs="*", default=["dias_ultima_interaccion"],
+                    help="columnas a quitar de X junto con sus derivadas (vacío = no quitar nada). "
+                         "En modo 'temporal', quitar dias_ultima_interaccion elimina también sus lags")
     a = ap.parse_args()
     main(Config(ruta_datos=a.datos, ruta_salida=a.salida, n_trials_optuna=a.trials,
                 top_k=a.top_k, umbral_ohe=a.umbral_ohe, n_seeds_final=a.n_seeds, seed=a.semilla,
                 n_folds=a.n_folds, n_meses_validacion=a.meses_val, modo_features=a.modo_features,
-                bootstrap_ic=a.bootstrap_ic, n_bootstrap=a.n_bootstrap))
+                bootstrap_ic=a.bootstrap_ic, n_bootstrap=a.n_bootstrap,
+                grid_arboles=tuple(a.grid_arboles), cols_excluir=list(a.excluir)))

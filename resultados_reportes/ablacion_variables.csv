@@ -1,6 +1,0 @@
-config,gini_mean,gini_std
-A: Solo estáticas (base),0.2294,0.0092
-B: + TE categóricas,0.243,0.0085
-C: + Temporales (lags/rolling),0.2405,0.0088
-D: + Regularización,0.2505,0.0079
-E: + Ruido sintético,0.2498,0.0081

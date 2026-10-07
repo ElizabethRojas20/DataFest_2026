@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>DataFest 2026 · Validación y robustez</title>
+<style>
+:root{--bg:#fafaf8;--fg:#1f2328;--mute:#59636e;--card:#fff;--line:#d8dce0;--acc:#1a5fb4;--ok:#1e7a46;--warn:#a15c00;--bad:#b3261e;--code:#f0f2f4;--bar:#1a5fb4;--bar2:#9aa5b1}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#14171a;--fg:#e6e8ea;--mute:#9aa4ad;--card:#1c2025;--line:#323940;--acc:#6ea8ff;--ok:#5fcf8b;--warn:#f0b050;--bad:#ff8a80;--code:#262b31;--bar:#6ea8ff;--bar2:#59636e}}
+:root[data-theme="dark"]{--bg:#14171a;--fg:#e6e8ea;--mute:#9aa4ad;--card:#1c2025;--line:#323940;--acc:#6ea8ff;--ok:#5fcf8b;--warn:#f0b050;--bad:#ff8a80;--code:#262b31;--bar:#6ea8ff;--bar2:#59636e}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:16px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:980px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:1.9rem;line-height:1.2;margin:.2em 0}
+h2{font-size:1.35rem;margin:2.2em 0 .6em;padding-top:.6em;border-top:1px solid var(--line)}
+h3{font-size:1.08rem;margin:1.6em 0 .4em}
+p,li{max-width:75ch}
+.sub{color:var(--mute);margin:0 0 1.2em}
+nav{display:flex;flex-wrap:wrap;gap:8px;margin:1em 0 0}
+nav a{font-size:.85rem;padding:4px 10px;border:1px solid var(--line);border-radius:999px;color:var(--acc);text-decoration:none;background:var(--card)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin:12px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.kpi b{display:block;font-size:1.5rem}
+.kpi span{color:var(--mute);font-size:.85rem}
+table{border-collapse:collapse;width:100%;font-size:.88rem;background:var(--card)}
+th,td{border:1px solid var(--line);padding:6px 8px;text-align:left;vertical-align:top}
+th{background:var(--code)}
+.scroll{overflow-x:auto}
+code{background:var(--code);padding:1px 5px;border-radius:4px;font-size:.88em}
+.tag{display:inline-block;font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;border:1px solid currentColor}
+.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--bad)}
+.eq{font-family:ui-monospace,Consolas,monospace;background:var(--code);padding:8px 12px;border-radius:8px;margin:8px 0;overflow-x:auto;font-size:.9rem}
+.bars div{display:grid;grid-template-columns:150px 1fr 60px;gap:8px;align-items:center;margin:4px 0;font-size:.86rem}
+.bars i{display:block;height:14px;border-radius:3px;background:var(--bar2)}
+.bars i.hi{background:var(--bar)}
+@media(max-width:560px){.bars div{grid-template-columns:110px 1fr 54px}}
+</style>
+</head>
+<body>
+<main>
+<h1>DataFest 2026: validación de modelos y pruebas de robustez</h1>
+<p class="sub">Resumen de todo lo trabajado en la sesión: auditoría del repositorio, validación sobre datos nuevos (diciembre), nueve pruebas de robustez con su fundamento matemático y estadístico, y el estado de la decisión final. Fecha de entrega del concurso: 7 de octubre de 2026.</p>
+<nav>
+<a href="#resumen">Resumen</a><a href="#cronologia">Cronología</a><a href="#auditoria">Auditoría</a><a href="#validacion">Validación en diciembre</a><a href="#modelos">¿Modelos correctos?</a><a href="#robustez">Pruebas R1–R9</a><a href="#tabla">Comparación</a><a href="#limites">Límites e incidentes</a><a href="#pendiente">Pendiente</a>
+</nav>
+
+<h2 id="resumen">1. Resumen</h2>
+<div class="grid">
+<div class="card kpi"><b>+0,0092</b><span>Ganancia de Gini de <code>lgb_sup_sin_dui</code> frente al modelo de referencia (IC95 [+0,0044; +0,0141], p_Holm = 0,005, 4 de 4 folds)</span></div>
+<div class="card kpi"><b>0 de 9</b><span>Modelos que "se caen" en diciembre según los criterios fijados antes de ver resultados</span></div>
+<div class="card kpi"><b>~0,25</b><span>Techo de Gini con estos datos: la señal es débil y simple, y todos los boosting convergen ahí</span></div>
+</div>
+<p>Conclusiones principales:</p>
+<ul>
+<li>El tratamiento de datos no tiene fugas de información. La validación temporal es la correcta para este panel de clientes.</li>
+<li>El gradient boosting es la familia adecuada. RandomForest y las redes neuronales rinden peor.</li>
+<li>Los errores graves estaban en la orquestación del pipeline (selección del ganador, Optuna, bootstrap) y en la documentación, no en los modelos.</li>
+<li><code>dias_ultima_interaccion</code> no tiene señal en diciembre: allí es una permutación exacta de <code>dias_ultima_transaccion</code>.</li>
+<li>El candidato <code>lgb_sup_sin_dui</code> (LightGBM con árboles pequeños, sin esa variable) es el único que supera de forma significativa a la referencia y cumple la regla de reemplazo de CLAUDE.md.</li>
+<li><strong>La entrega <code>submission_final.csv</code> todavía no se ha reemplazado.</strong> Esa decisión queda pendiente de tu confirmación.</li>
+</ul>
+
+<h2 id="cronologia">2. Cronología de la sesión</h2>
+<ol>
+<li><strong>Auditoría integral</strong> con tres especialistas en paralelo (código, datos y negocio, modelos). Cada hallazgo importante se verificó de forma independiente.</li>
+<li><strong>Pregunta tuya:</strong> "¿lo realizado está mal?". Respuesta: la base metodológica es sólida; fallan la orquestación y la documentación.</li>
+<li><strong>Entorno:</strong> instalación de Python 3.12 y creación de <code>.venv</code>, porque el Python 3.14 instalado no podía ejecutar el pipeline ni tenía las librerías.</li>
+<li><strong>Carpeta <code>validacion_modelos/</code></strong> y validación de los modelos sobre diciembre a cargo del ingeniero de ML. Aclaraste que se entrena con <code>train.csv</code>; test solo se predice.</li>
+<li><strong>Tu pregunta sobre la construcción de los modelos:</strong> la calidad es buena; lo frágil es cómo se elige el número de árboles (early stopping).</li>
+<li><strong>Tu pregunta sobre qué modelos convienen:</strong> se propusieron cinco candidatos, y R1 se amplió para compararlos.</li>
+<li><strong>Pruebas de robustez R1–R9</strong> con criterios registrados antes de ejecutar, más una auditoría de código sobre la base de scripts y el análisis de segmentos (R5).</li>
+<li><strong>Incidentes:</strong> un proceso de un agente cerró los procesos Python de otro; el ingeniero relanzó lo afectado.</li>
+</ol>
+
+<h2 id="auditoria">3. Auditoría del repositorio</h2>
+<h3>Lo que está bien</h3>
+<ul>
+<li>Lags, target encoding, concatenación de train y test y selección de variables solo usan información pasada.</li>
+<li><code>id_cliente</code> y <code>mes</code> no se usan como predictores.</li>
+<li>El formato de <code>submission_final.csv</code> es válido: 9.900 filas, orden de <code>test.csv</code>, sin nulos.</li>
+<li>Las cifras descriptivas de los datos documentadas son correctas.</li>
+</ul>
+<h3>Lo que estaba mal</h3>
+<div class="scroll"><table>
+<tr><th>Hallazgo</th><th>Dónde</th><th>Estado</th></tr>
+<tr><td>El ganador y <code>mejor_iter</code> salen solo del último fold (noviembre), no de la media</td><td><code>Pipeline_DF_WCB.py:847, 936</code></td><td><span class="tag ok">Verificado por mí</span></td></tr>
+<tr><td>Los trials de Optuna se registran como un modelo más y pueden salir "ganadores"</td><td><code>:748</code></td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td>El IC bootstrap no remuestrea con reemplazo (<code>np.isin</code>), sale ~25 % más estrecho, y no se guarda</td><td><code>:820</code></td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td>Factor de escalado de árboles fijo en 1,333 (el real ronda 1,094)</td><td><code>:920</code></td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td>El pipeline no arranca en Python 3.14: los textos de ayuda con <code>IC95%</code> rompen argparse</td><td><code>:975, 977</code> y <code>comparar_submissions.py:127, 129</code></td><td><span class="tag ok">Ejecutado</span></td></tr>
+<tr><td>CSV y figuras inventados o de relleno (bootstrap simulado con <code>np.random.normal</code>, ablación escrita a mano, importancias y correlaciones de relleno)</td><td><code>scripts_utilitarios/generar_csvs_figuras.py</code></td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td>Las cifras del informe (0,2516 / 0,2638) no salen del pipeline: vienen de <code>verificaciones/03</code> con otra configuración</td><td>INFORME, README</td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td>Documentación desactualizada: <code>--folds</code> (el flag real es <code>--n-folds</code>), "val dic" (diciembre es test), "gain", "50 features" (son 39)</td><td>README, INFORME, CLAUDE.md</td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td><code>ejecutar_pipeline_final.sh</code> escribe directamente sobre la entrega</td><td>línea 72</td><td><span class="tag ok">Verificado</span></td></tr>
+<tr><td>Datos y modelos versionados aunque <code>.gitignore</code> los excluye</td><td><code>datos_entrada/</code>, <code>modelos/</code></td><td><span class="tag ok">Verificado</span></td></tr>
+</table></div>
+<p>Sobre el hash: el sha256 documentado (<code>88111e48…</code>) coincide con el archivo tal como está en git. La copia local tiene finales de línea CRLF (<code>core.autocrlf=true</code>) y por eso da <code>39b39aff…</code>. Los datos son idénticos.</p>
+
+<h3>Hallazgo de datos más importante</h3>
+<div class="card">
+<p>En cada mes <em>m</em>, <code>dias_ultima_interaccion</code> coincide con <code>dias_ultima_transaccion</code> en una fracción de filas ≈ (12−m)/11, y el resto es ruido. En <strong>diciembre es una permutación exacta</strong> de la otra columna (correlación −0,003).</p>
+<div class="scroll"><table>
+<tr><th></th><th>ago</th><th>sep</th><th>oct</th><th>nov</th><th>dic (test)</th></tr>
+<tr><td>% filas con dui = dut</td><td>36,5</td><td>27,6</td><td>18,4</td><td>9,4</td><td>0,3</td></tr>
+<tr><td>% clientes nuevos</td><td>17,5</td><td>13,1</td><td>18,2</td><td>7,7</td><td>18,6</td></tr>
+</table></div>
+<p>Esto explica por qué las features temporales "no ayudaban" (eran lags de ruido) y por qué la validación de agosto a noviembre no representa del todo a diciembre.</p>
+</div>
+<h3>Otros hechos de datos</h3>
+<ul>
+<li><code>es_nuevo_cliente</code> no tiene relación con ser nuevo en el panel (19 % en ambos grupos).</li>
+<li>La antigüedad en el panel no aporta: los nuevos convierten más por su perfil (tasa esperada por estrato 16,8 % frente a 16,95 % observada).</li>
+<li><code>id_cliente</code> codifica exactamente la cohorte de entrada, por eso no debe usarse.</li>
+<li>Todas las relaciones son observacionales; los datos parecen sintéticos.</li>
+</ul>
+
+<h2 id="validacion">4. Validación sobre datos nuevos (diciembre)</h2>
+<p><code>test.csv</code> no tiene <code>objetivo</code>, así que el Gini de diciembre no se puede medir. Se usaron diagnósticos sin etiquetas y simulaciones. Los criterios del veredicto se fijaron en <code>comun.py</code> a las 22:34, antes de los resultados (22:37 y 22:44).</p>
+<div class="scroll"><table>
+<tr><th>Prueba</th><th>Fundamento</th><th>Resultado</th></tr>
+<tr><td>Drift de variables (PSI)</td><td><span class="eq">PSI = Σ (a_i − r_i)·ln(a_i / r_i)</span> sobre bins de la referencia. &lt;0,1 estable; 0,1–0,25 moderado; ≥0,25 severo.</td><td>PSI &lt; 0,01 en todas las variables estáticas.</td></tr>
+<tr><td>Validación adversarial</td><td>Un clasificador intenta distinguir filas de noviembre de filas de diciembre. AUC 0,5 = indistinguibles.</td><td>AUC 0,501 sin dui. Con dui sube a 0,518 (0,532 con el indicador dui=dut): se detecta la ruptura entre las dos columnas.</td></tr>
+<tr><td>Drift de predicciones</td><td>PSI de los scores del <em>mismo</em> modelo entre noviembre y diciembre.</td><td>PSI ≤ 0,025. (Comparar modelos con distinto número de árboles da falsos positivos; por eso se fijó el mismo modelo.)</td></tr>
+<tr><td>Estabilidad del ranking</td><td>Correlación de Spearman entre modelos y entre semillas, noviembre frente a diciembre.</td><td>El acuerdo entre modelos no baja en diciembre.</td></tr>
+<tr><td>Gini en condiciones de diciembre</td><td>Se permuta dui dentro del mes y se llevan los clientes nuevos al 18,6 %. Caída significativa si &gt; 2 SE pareados.</td><td>Cambio entre −0,005 y +0,004, siempre dentro del ruido.</td></tr>
+</table></div>
+<p><span class="tag ok">Veredicto</span> Ningún modelo "se cae". Lo que separa a los modelos es el nivel de Gini, no la estabilidad.</p>
+<div class="card bars">
+<strong>Gini medio walk-forward honesto (ago–nov)</strong>
+<div><span>CatBoost</span><i class="hi" style="width:100%"></i><span>0,2509</span></div>
+<div><span>LGBM reg. sin dui</span><i class="hi" style="width:99.4%"></i><span>0,2496</span></div>
+<div><span>LGBM sin regularizar</span><i style="width:99.1%"></i><span>0,2488</span></div>
+<div><span>LGBM regularizado</span><i style="width:98.5%"></i><span>0,2472</span></div>
+<div><span>XGBoost</span><i style="width:97.8%"></i><span>0,2454</span></div>
+<div><span>RandomForest</span><i style="width:94.4%"></i><span>0,2368</span></div>
+<div><span>MLP (sep–nov)</span><i style="width:73.8%"></i><span>0,1853</span></div>
+<p style="font-size:.8rem;color:var(--mute);margin:.4em 0 0">Las barras parten de cero. Los boosting no se distinguen entre sí dentro del ruido. RandomForest y el MLP son peores; con la corrección de Holm, solo el MLP lo es de forma significativa en esa tabla.</p>
+</div>
+<h3>Optimismo de validar mal</h3>
+<p>Hacer early stopping sobre el mismo mes que luego se evalúa infla el Gini entre +0,0045 y +0,0076. Es lo que hacía el pipeline. En la validación honesta se hace el early stopping sobre el mes anterior (M−1) y se evalúa en M.</p>
+<h3>Un matiz sobre el número de árboles</h3>
+<p>El early stopping elige 8, 25, 29 o 141 árboles según el fold con los mismos hiperparámetros. No es un fallo de los modelos: la curva Gini frente a número de árboles es casi plana y el ruido mensual (SE ≈ 0,015) domina la elección. Por eso se añadió la prueba R2.</p>
+<h3>Redes neuronales</h3>
+<ul>
+<li>Se entrenaron con enero–agosto, así que su Gini de agosto es dentro de muestra.</li>
+<li>Las redes Keras hacen early stopping sobre septiembre–noviembre, así que su Gini en esos meses es optimista.</li>
+<li>El escalado se ajustó con todo train.</li>
+</ul>
+
+<h2 id="modelos">5. ¿Son correctos los modelos elegidos?</h2>
+<p>La familia sí: datos tabulares, ~110 mil filas, 15 % de positivos, métrica de ranking y una señal débil (la mejor variable sola tiene AUC ≈ 0,55). Casi toda la señal está en <code>banda_riesgo × numero_productos</code>, <code>dias_ultima_transaccion</code> y <code>activo_movil</code>. Cuando la señal cabe en pocos cortes, cualquier modelo flexible la captura y todos empatan.</p>
+<ul>
+<li><strong>No ayudan:</strong> promediar rankings (±0,0025), modelos de supervivencia, la antigüedad en el panel y las redes neuronales.</li>
+<li><strong>Sí aportan:</strong> quitar <code>dias_ultima_interaccion</code>, árboles más superficiales y un número de árboles justificado en lugar de elegido por el ruido.</li>
+<li>Se añadió un EBM (modelo aditivo con interacciones) como referencia interpretable, para comprobar que el boosting no sobreajusta.</li>
+</ul>
+
+<h2 id="robustez">6. Pruebas de robustez R1–R9</h2>
+<p>Los criterios, las hipótesis y las reglas de decisión se escribieron en <code>scripts/criterios_robustez.py</code> a las 23:34, antes de que existiera ningún resultado. Después de una auditoría de código se añadió una enmienda fechada antes de los resultados (predicciones sin redondear, escenario de diciembre sin pesos adversariales, corrección de Holm en todas las comparaciones).</p>
+<p><strong>Candidatos:</strong> <code>lgb_reg</code> (referencia), <code>catboost</code>, <code>catboost_sin_dui</code>, <code>lgb_sup_sin_dui</code> (8 hojas, <code>min_child_samples=200</code>, <code>reg_lambda=10</code>, <code>colsample=0,8</code>) y <code>ebm_sin_dui</code>.</p>
+
+<h3>R1. Comparación formal de modelos</h3>
+<p><strong>Hipótesis.</strong> H0: el modelo candidato y la referencia tienen el mismo AUC. H1: difieren.</p>
+<p><strong>Fundamento.</strong> El AUC es el estadístico U de Mann-Whitney: la probabilidad de que un convertido reciba más score que un no convertido. Como los dos modelos se evalúan sobre las mismas filas, sus AUC están correlacionadas. DeLong estima esa covarianza con los <em>componentes de colocación</em> de cada observación. Como un cliente aparece en varios meses, el cliente es la unidad de remuestreo: se hace un bootstrap por conglomerados sobre los 4 folds a la vez. Con 10 comparaciones se aplica Holm, que controla la probabilidad de algún falso positivo (FWER ≤ 5 %).</p>
+<div class="eq">AUC = U / (P·N)    ·    Gini = 2·AUC − 1    ·    Holm: p(i) ≤ α / (m − i + 1)</div>
+<p><strong>Resultado.</strong> Solo <code>lgb_sup_sin_dui</code> supera a la referencia: +0,0092 [+0,0044; +0,0141], p_Holm = 0,005, en 4 de 4 folds. Yo recalculé las diferencias por fold (+0,017, +0,005, +0,001, +0,013) y un bootstrap pareado de 300 réplicas dio un IC de [0,0042; 0,0136] sin ninguna réplica ≤ 0. CatBoost, CatBoost sin dui y EBM quedan en +0,004 a +0,005 con p_Holm ≥ 0,41 y empeoran en octubre.</p>
+
+<h3>R2. Sensibilidad al número de árboles</h3>
+<p><strong>Fundamento.</strong> Cerca del óptimo la curva Gini(n) es plana, y el máximo empírico depende sobre todo del ruido. La regla de 1 error estándar elige el menor n cuyo Gini queda a menos de 1 SE del máximo, lo que reduce la varianza de la elección. Una "meseta" amplia indica que el resultado no depende de un valor de n concreto.</p>
+<p><strong>Resultado.</strong> La meseta de <code>lgb_sup_sin_dui</code> abarca de 70 a 1000 árboles (un factor 14) y con 1000 árboles solo pierde 0,005. Los modelos con árboles más profundos pierden entre 0,017 y 0,023, porque sobreajustan antes. El early stopping de LightGBM ya paraba por AUC, así que <code>first_metric_only</code> no habría cambiado nada.</p>
+
+<h3>R3. Sensibilidad a hiperparámetros</h3>
+<p><strong>Fundamento.</strong> Si el óptimo está en una zona plana, el rendimiento no depende del ajuste fino y generaliza mejor que un pico estrecho. Se evaluó una rejilla alrededor del preset; es robusto si el rango de Gini en la vecindad es ≤ 1 SE.</p>
+<p><strong>Resultado.</strong> <code>lgb_sup_sin_dui</code> pasa: las 25 configuraciones vecinas varían 0,0029 y todas superan a la referencia. <code>catboost_sin_dui</code> falla por muy poco (0,0082 frente al límite 0,0080).</p>
+
+<h3>R4. Varianza por semilla y por muestra de entrenamiento</h3>
+<p><strong>Fundamento.</strong> Mide la varianza del estimador: si se reentrena con otra semilla o con otra muestra de clientes, ¿cambia el top-10 % de diciembre? Con señal débil, los clientes cercanos al umbral cambian fácilmente de lado. Se midieron el índice de Jaccard del top-10 % y el porcentaje de clientes con pertenencia estable ≥ 90 %.</p>
+<p><strong>Resultado.</strong> Todos los candidatos quedan por debajo del 85 % exigido ante el remuestreo de clientes (<code>lgb_sup</code> 83 %, <code>lgb_reg</code> 76 %). Ante la semilla, <code>lgb_sup</code> llega al 95 %. Es un límite del problema, no de un modelo concreto.</p>
+
+<h3>R5. Robustez por segmentos</h3>
+<p><strong>Fundamento.</strong> El AUC global se descompone en pares dentro de un mismo segmento y pares entre segmentos:</p>
+<div class="eq">AUC = Σ_s w_s·AUC_s + w_entre·AUC_entre,    w_s = P_s·N_s / (P·N)</div>
+<p>Como los pesos suman 1, la misma identidad vale para el Gini. Verifiqué que el 70,6 % del Gini global de CatBoost sale de pares de clientes de bandas de riesgo distintas. Al fijar la banda desaparece ese componente fácil, así que el Gini intra-segmento baja sin que el modelo ordene peor ningún par (efecto tipo Simpson sobre la métrica).</p>
+<p><strong>Resultado.</strong> Ningún segmento resulta preocupante. La banda <code>medium</code> tiene un Gini de ≈ 0,07 a 0,085 porque dentro de ella ninguna variable ordena (todas con |Gini| &lt; 0,05); yo recalculé 0,070 para <code>lgb_reg</code>. El orden entre modelos se mantiene dentro del ruido en cada segmento, y <code>lgb_sup_sin_dui</code> es el mejor en 8 de 10 segmentos. En diciembre, el top-10 % está formado en un 99,5–100 % por la banda <code>low</code>, que coincide con las celdas de mayor tasa histórica. Una tabla de 72 celdas captura los mismos convertidos en el top-10/20 % que el modelo; en la banda <code>high</code> el modelo ordena mucho mejor que cualquier regla simple, porque usa la recencia de transacción como variable continua.</p>
+
+<h3>R6. Perturbación de variables</h3>
+<p><strong>Fundamento.</strong> El ruido de medición en x atenúa la relación con el objetivo: el efecto estimado se multiplica por var(x) / (var(x) + var(ε)). Se aplicó ruido multiplicativo del 5, 10 y 20 % al predecir, y se midió la importancia por permutación en validación (no in-sample, que favorece variables sobreajustadas). Es robusto si la caída con un 10 % de ruido es &lt; 1 SE y ninguna variable concentra más del 50 % de la importancia.</p>
+<p><strong>Resultado.</strong> La caída es ≤ 0,003 en todos. <code>lgb_reg</code> y <code>catboost</code> concentran en <code>banda_riesgo</code> un 52 % y un 51 %, rozando el límite; <code>lgb_sup</code> reparte más (47 %).</p>
+
+<h3>R7. Degradación con la distancia temporal</h3>
+<p><strong>Fundamento.</strong> Es el único proxy de concept drift sin etiquetas de diciembre. Se entrena hasta el mes k y se evalúa en k+1…k+4, y se ajusta una regresión del Gini sobre el desfase con efectos fijos del mes de origen.</p>
+<p><strong>Resultado.</strong> Pendiente ≈ −0,004 por mes de desfase, casi igual en todos los modelos. Con efectos fijos del mes evaluado baja a −0,0005/−0,003 por mes. Con Holm, ninguna es significativa. Diciembre está a un mes, el caso más favorable. Si se usa en producción, conviene reentrenar cada mes.</p>
+
+<h3>R8. Placebo (control de fuga)</h3>
+<p><strong>Fundamento.</strong> Prueba de permutación: se baraja <code>objetivo</code> dentro de cada mes y se reentrena. Si el procedimiento tiene fuga o sobreajuste, el Gini placebo no será ≈ 0. El p-valor exacto es (1+k)/(1+B).</p>
+<p><strong>Resultado.</strong> El Gini placebo queda centrado en 0 y el real está a z = 11,4. Con B = 100 réplicas, el p mínimo posible es 1/101. No hay indicio de fuga.</p>
+
+<h3>R9. Curva de aprendizaje</h3>
+<p><strong>Fundamento.</strong> El error suele seguir una ley potencia, err(n) ≈ a·n<sup>−b</sup> + c. Cuando la curva se aplana, el límite está en la información de las variables (c) y no en el tamaño de la muestra.</p>
+<p><strong>Resultado.</strong> Pasar del 75 % al 100 % de los clientes aporta entre 0 y +0,006 de Gini: está saturado.</p>
+
+<h2 id="tabla">7. Comparación de candidatos</h2>
+<div class="scroll"><table>
+<tr><th>Prueba</th><th>lgb_reg</th><th>catboost</th><th>catboost_sin_dui</th><th>lgb_sup_sin_dui</th><th>ebm_sin_dui</th></tr>
+<tr><td>R1 Gini medio</td><td>0,2472</td><td>0,2509</td><td>0,2524</td><td><strong>0,2564</strong></td><td>0,2524</td></tr>
+<tr><td>R1 Δ frente a lgb_reg (p_Holm; folds a favor)</td><td>—</td><td>+0,0037 (0,88; 3/4)</td><td>+0,0052 (0,41; 3/4)</td><td><strong>+0,0092 (0,005; 4/4)</strong></td><td>+0,0053 (0,88; 3/4)</td></tr>
+<tr><td>Regla de reemplazo de CLAUDE.md</td><td>—</td><td class="bad">no</td><td class="bad">no</td><td class="ok"><strong>cumple</strong></td><td class="bad">no</td></tr>
+<tr><td>R2 meseta de árboles</td><td class="ok">×100</td><td class="ok">×7</td><td class="ok">×5,7</td><td class="ok">×14</td><td>—</td></tr>
+<tr><td>R3 hiperparámetros</td><td>—</td><td>—</td><td class="bad">falla</td><td class="ok">pasa</td><td>—</td></tr>
+<tr><td>R4 top-10 % estable (semilla / remuestreo)</td><td class="bad">87 / 76 %</td><td>—</td><td>—</td><td class="bad">95 / 83 %</td><td class="bad">98 / 84 %</td></tr>
+<tr><td>R5 peor segmento (banda medium)</td><td>0,070</td><td>0,074</td><td>0,075</td><td>0,085</td><td>0,076</td></tr>
+<tr><td>R6 peso de banda_riesgo</td><td class="bad">52 %</td><td class="bad">51 %</td><td class="ok">49 %</td><td class="ok">47 %</td><td class="ok">49 %</td></tr>
+<tr><td>R7 pendiente por mes (Holm)</td><td class="ok">pasa</td><td class="ok">pasa con Holm</td><td class="ok">pasa</td><td class="ok">pasa</td><td class="ok">pasa</td></tr>
+<tr><td>R8 placebo</td><td>—</td><td>—</td><td>—</td><td class="ok">pasa (z = 11,4)</td><td>—</td></tr>
+<tr><td>R9 curva de aprendizaje</td><td class="ok">saturado</td><td>—</td><td class="ok">saturado</td><td class="ok">saturado</td><td>—</td></tr>
+</table></div>
+<p>"—" significa que la prueba no se aplicó a ese candidato, como se registró de antemano.</p>
+<h3>Por qué gana <code>lgb_sup_sin_dui</code></h3>
+<p>Descomposición aproximada de la ganancia (<span class="tag warn">PLAUSIBLE</span>, no medida por separado): ≈ +0,004 por árboles más pequeños que encajan con una señal de pocos cortes, ≈ +0,0025 por quitar <code>dias_ultima_interaccion</code> y ≈ +0,003 por un early stopping más estable. Descontando el sesgo de haber elegido 1 entre 5 candidatos y la selección de segundo orden (el preset de <code>lgb_reg</code> se eligió con experimentos sobre ventanas que se solapan con ago–nov), la mejora esperada en diciembre es de entre +0,004 y +0,009.</p>
+
+<h2 id="limites">8. Límites e incidentes</h2>
+<ul>
+<li><strong>Sin etiquetas de diciembre</strong> no se puede detectar un cambio en la relación entre las variables y el objetivo (concept drift).</li>
+<li><strong>El SE de un fold de un mes es ≈ 0,015</strong>, no 0,009. La regla "+0,003 y ningún fold peor" tiene poca potencia; por eso se usó una prueba pareada conjunta por cliente.</li>
+<li><strong>Escenario adversarial descartado.</strong> Los pesos adversariales correlacionan con el score (Spearman ≈ −0,14 por fold) y dan un bono mecánico en noviembre. Lo comprobé y no se usó como escenario principal.</li>
+<li><strong>Corrección de Holm:</strong> con ella, RandomForest (z ≈ 2,36) no queda significativamente peor en la tabla anterior; el MLP y <code>nn_baseline</code> sí.</li>
+<li><strong>Error de informe anterior:</strong> <code>INFORME_VALIDACION.md:164</code> explica el efecto de dui al revés (el porcentaje de coincidencia baja de agosto a noviembre). El signo del efecto de permutar dui cambia por fold. Está corregido en <code>INFORME_ROBUSTEZ.md</code>; el archivo original no se modificó.</li>
+<li><strong>Incidente de procesos:</strong> un agente cerró con <code>taskkill</code> todos los procesos Python, incluidos los del ingeniero. Se relanzó lo afectado; el ingeniero reporta que R4 v1 quedó obsoleto (reemplazado por R4 v2) y que se hicieron recortes pre-registrados: CatBoost con 1 semilla en R3 y R7, R8 con 100 réplicas y R9 sin EBM.</li>
+<li><strong>Cómputo:</strong> unas 2,5 horas de reloj, por encima de lo previsto.</li>
+<li><strong>Reproducibilidad:</strong> <code>03_redes_neuronales.py</code> falla desde un clon limpio porque usa archivos <code>.npy</code> ignorados por git. Los resultados ocupan ~60 MB y conviene excluir los CSV de predicciones.</li>
+<li><strong>Entorno:</strong> el <code>requirements.txt</code> original no es instalable en Python 3.12 (catboost 1.2.0, tensorflow 2.16.1…). Las versiones que funcionan están en <code>requirements-validacion.txt</code>.</li>
+</ul>
+
+<h2 id="pendiente">9. Decisiones y acciones pendientes</h2>
+<ol>
+<li><strong>Cerrar dos procesos Python sobrantes</strong> (PID 2380, R4 v1 obsoleto, y PID 15476, repetición redundante de R7). Requiere tu confirmación.</li>
+<li><strong>Reemplazar la entrega</strong> (requiere tu confirmación): archivar la actual en <code>resultados_reportes/historico/</code> con fecha y copiar <code>validacion_modelos/resultados/submission_candidata_lgb_sup_sin_dui.csv</code> como <code>submission_final.csv</code>. El formato del candidato está comprobado: 9.900 filas, orden de <code>test.csv</code>, valores en [0,1], sin nulos.</li>
+<li><strong>Llevar la configuración ganadora al pipeline</strong> (preset <code>lgb_sup</code>, sin <code>dias_ultima_interaccion</code>) y corregir los errores de orquestación: ganador por media, trials de Optuna fuera de la tabla, bootstrap con reemplazo, factor de árboles real y <code>IC95%%</code> en argparse.</li>
+<li><strong>Limpiar la documentación:</strong> quitar o regenerar los CSV y figuras inventados (fig3, fig4, fig5, fig7, fig9), actualizar las cifras del informe con las corridas reales y corregir <code>--folds</code>, "val dic", "gain" y "50 features".</li>
+<li><strong>Scripts auxiliares:</strong> <code>ejecutar_pipeline_final.sh</code> debe escribir en una candidata, y <code>comparar_submissions.py</code> necesita umbral 0,003 y salida ASCII.</li>
+<li><strong>Git:</strong> añadir exclusiones explícitas para los CSV de predicciones y decidir si los datos deben seguir versionados.</li>
+</ol>
+<p style="color:var(--mute);font-size:.85rem;margin-top:2em">Archivos de referencia: <code>validacion_modelos/INFORME_VALIDACION.md</code>, <code>validacion_modelos/INFORME_ROBUSTEZ.md</code>, <code>validacion_modelos/resultados/robustez_tabla_comparativa.csv</code> y <code>validacion_modelos/scripts/</code>.</p>
+</main>
+</body>
+</html>

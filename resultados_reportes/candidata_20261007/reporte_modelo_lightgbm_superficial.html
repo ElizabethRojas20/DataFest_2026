@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LightGBM Superficial - DataFest 2026</title>
+<style>
+:root{--bg:#f7f8fa;--card:#fff;--tx:#1c2430;--mut:#5b6677;--bd:#dde2ea;--ac:#1f5fbf;--ac2:#e08a1e;--ok:#1f8a4c;--warn:#b25e00;--bar:#9db8e6}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#12161c;--card:#1b212b;--tx:#e6eaf0;--mut:#9aa6b8;--bd:#2d3644;--ac:#6ea4f4;--ac2:#f0a850;--ok:#4cc27d;--warn:#f0a850;--bar:#3a5a8f}}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:920px;margin:0 auto;padding:24px 16px 64px}
+h1{font-size:1.9rem;margin:.2em 0 .1em}
+h2{font-size:1.25rem;margin:2em 0 .6em;padding-top:.4em;border-top:1px solid var(--bd)}
+h3{font-size:1.02rem;margin:1.2em 0 .3em}
+p,li{max-width:75ch}
+.sub{color:var(--mut);margin:0 0 1em}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:18px 0}
+.kpi{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px 16px}
+.kpi b{display:block;font-size:1.7rem;color:var(--ac)}
+.kpi span{color:var(--mut);font-size:.88rem}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:14px 18px;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:.92rem;background:var(--card)}
+th,td{border:1px solid var(--bd);padding:6px 9px;text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{background:var(--bg);font-weight:600}
+tr.top td{font-weight:600;background:color-mix(in srgb,var(--ac) 10%,var(--card))}
+.scroll{overflow-x:auto}
+code{background:var(--bg);border:1px solid var(--bd);border-radius:4px;padding:0 4px;font-size:.9em}
+.note{border-left:4px solid var(--ac2);background:var(--card);padding:8px 14px;margin:12px 0;border-radius:0 8px 8px 0}
+.ok{color:var(--ok)}.warn{color:var(--warn)}
+.bars{display:grid;grid-template-columns:150px 1fr 60px;gap:6px 10px;align-items:center;font-size:.9rem;margin:10px 0}
+.bars .t{background:var(--bd);border-radius:4px;height:16px;position:relative}
+.bars .t i{display:block;height:100%;border-radius:4px;background:var(--bar)}
+.bars .t i.s{background:var(--ac)}
+.bars .v{text-align:right;font-variant-numeric:tabular-nums}
+footer{margin-top:3em;color:var(--mut);font-size:.85rem}
+@media (max-width:560px){.bars{grid-template-columns:110px 1fr 50px}}
+</style>
+</head>
+<body>
+<main>
+<h1>LightGBM Superficial</h1>
+<p class="sub">Modelo candidato de DataFest 2026 para predecir la conversión de clientes en diciembre 2026. Reporte generado el 2026-10-07 a partir de la corrida <code>candidata_20261007</code>.</p>
+
+<div class="kpis">
+  <div class="kpi"><b>0,2540</b><span>Gini medio, 4 folds walk-forward (ago–nov)</span></div>
+  <div class="kpi"><b>0,238 – 0,268</b><span>IC95 % (bootstrap de clientes)</span></div>
+  <div class="kpi"><b>0,2375</b><span>Peor fold (noviembre)</span></div>
+  <div class="kpi"><b>38</b><span>variables, sin <code>dias_ultima_interaccion</code></span></div>
+</div>
+
+<h2>1. Resumen</h2>
+<p>El pipeline oficial (<code>pipelines/Pipeline_DF_WCB.py</code>) comparó seis modelos y eligió a <b>LightGBM con árboles poco profundos</b> (8 hojas) como ganador por Gini medio. Se entrenó con las 38 variables disponibles, sin <code>dias_ultima_interaccion</code>, y se promediaron 3 semillas.</p>
+<div class="note"><b>Importante:</b> <code>test.csv</code> no incluye el objetivo, por lo que el Gini de diciembre no puede medirse. Las cifras de este reporte son una <b>estimación</b> por validación temporal sobre los últimos cuatro meses de train.</div>
+<p>La ventaja sobre los demás modelos de árboles (CatBoost, LightGBM, XGBoost) es pequeña y no significativa (secciones 5 y 6). Sí es significativa frente al modelo anterior que usaba <code>dias_ultima_interaccion</code>.</p>
+
+<h2>2. Problema y métrica</h2>
+<ul>
+  <li><b>Objetivo:</b> probabilidad de que un cliente convierta (<code>objetivo = 1</code>) en diciembre 2026.</li>
+  <li><b>Datos:</b> 110.100 filas cliente-mes de enero a noviembre (tasa de conversión mensual ≈ 14–16 %) y 9.900 clientes en test. El 81,4 % de los clientes de test tiene historial en train.</li>
+  <li><b>Estructura:</b> un cliente aparece cada mes hasta que convierte. Solo <code>dias_ultima_interaccion</code> cambia con el tiempo; las demás columnas son constantes por cliente.</li>
+  <li><b>Métrica:</b> Gini = 2·AUC − 1. Solo importa el orden de las predicciones, no la calibración.</li>
+</ul>
+
+<h2>3. El modelo</h2>
+<p>LightGBM construye árboles de decisión uno tras otro, y cada árbol corrige los errores del conjunto anterior (gradient boosting). La variante <i>superficial</i> limita cada árbol a 8 hojas.</p>
+<h3>Por qué árboles superficiales</h3>
+<p>La señal del problema es débil (AUC ≈ 0,63). Con una señal así, el Gini en función del número de árboles forma una meseta ancha y ruidosa, y los modelos profundos tienden a ajustar ruido. Limitar la complejidad (pocas hojas, muchas filas mínimas por hoja y regularización L2 alta) da una curva más estable, por lo que el número de árboles elegido importa menos.</p>
+
+<div class="scroll"><table>
+<tr><th>Hiperparámetro</th><th>Valor</th><th>Efecto</th></tr>
+<tr><td><code>num_leaves</code></td><td>8</td><td>árboles pequeños; es lo que lo hace "superficial" (el modelo regularizado usa 31)</td></tr>
+<tr><td><code>min_child_samples</code></td><td>200</td><td>cada hoja necesita al menos 200 filas</td></tr>
+<tr><td><code>learning_rate</code></td><td>0,03</td><td>pasos pequeños; se compensa con más árboles</td></tr>
+<tr><td><code>reg_lambda</code></td><td>10</td><td>penalización L2 fuerte sobre los pesos de las hojas</td></tr>
+<tr><td><code>subsample</code> / <code>subsample_freq</code></td><td>0,7 / 1</td><td>cada árbol ve el 70 % de las filas</td></tr>
+<tr><td><code>colsample_bytree</code></td><td>0,8</td><td>cada árbol ve el 80 % de las variables</td></tr>
+<tr><td>Nº de árboles</td><td>200 en CV (×1,29 = ≈258 en el modelo final)</td><td>elegido con la regla 1-SE sobre la curva media de los folds</td></tr>
+</table></div>
+
+<h2>4. Variables</h2>
+<p>Se usan 38 columnas: las variables numéricas y binarias originales más codificación One-Hot de <code>ocupacion</code>, <code>region</code>, <code>canal_adquisicion</code>, <code>banda_riesgo</code> y <code>dispositivo_principal</code>. No se usan <code>id_cliente</code> ni <code>mes</code>, no hay features temporales (modo <code>estatico</code>) y la selección no eliminó ninguna columna (sin varianza cero ni correlaciones &gt; 0,95).</p>
+
+<h3>Importancia por permutación (top 9)</h3>
+<div class="bars">
+<span>numero_productos</span><div class="t"><i class="s" style="width:100%"></i></div><span class="v">0,060</span>
+<span>dias_ultima_transaccion</span><div class="t"><i style="width:90.6%"></i></div><span class="v">0,054</span>
+<span>banda_riesgo_low</span><div class="t"><i style="width:66.5%"></i></div><span class="v">0,040</span>
+<span>banda_riesgo_high</span><div class="t"><i style="width:50.9%"></i></div><span class="v">0,031</span>
+<span>saldo_promedio</span><div class="t"><i style="width:40.3%"></i></div><span class="v">0,024</span>
+<span>ingresos</span><div class="t"><i style="width:39.2%"></i></div><span class="v">0,024</span>
+<span>ratio_deuda_ingresos</span><div class="t"><i style="width:38.5%"></i></div><span class="v">0,023</span>
+<span>antiguedad_cuenta_meses</span><div class="t"><i style="width:38.5%"></i></div><span class="v">0,023</span>
+<span>edad</span><div class="t"><i style="width:36.3%"></i></div><span class="v">0,022</span>
+</div>
+<p class="sub">Caída del AUC al permutar cada variable, calculada en la selección del pipeline. Es una indicación de relevancia, no un efecto causal.</p>
+
+<h3>Por qué se excluye <code>dias_ultima_interaccion</code></h3>
+<p>Es la única variable que cambia en el tiempo y su comportamiento en diciembre es el principal riesgo de deriva. En los escenarios de prueba (variable permutada y 18,6 % de clientes nuevos), los modelos sin ella pierden menos Gini y la comparación les favorece. El pipeline la excluye por defecto (<code>--excluir dias_ultima_interaccion</code>).</p>
+
+<h2>5. Validación</h2>
+<ul>
+  <li><b>Walk-forward:</b> cada uno de los últimos cuatro meses de train es un fold; se entrena con todos los meses anteriores y se predice ese mes. Así se imita la situación real de predecir un mes futuro.</li>
+  <li><b>Sin fuga de información:</b> no hay <code>train_test_split</code> aleatorio, y el número de árboles de cada fold se elige con los otros folds, no con el mes evaluado.</li>
+  <li><b>Incertidumbre:</b> bootstrap de clientes con reemplazo (500 réplicas), compartido entre modelos para que las diferencias sean pareadas.</li>
+</ul>
+
+<h3>Gini por mes (LightGBM Superficial)</h3>
+<div class="bars">
+<span>Agosto (fold 1)</span><div class="t"><i class="s" style="width:92.6%"></i></div><span class="v">0,2632</span>
+<span>Septiembre (fold 2)</span><div class="t"><i class="s" style="width:88%"></i></div><span class="v">0,2502</span>
+<span>Octubre (fold 3)</span><div class="t"><i class="s" style="width:93.2%"></i></div><span class="v">0,2649</span>
+<span>Noviembre (fold 4)</span><div class="t"><i class="s" style="width:83.5%"></i></div><span class="v">0,2375</span>
+<span><b>Media</b></span><div class="t"><i class="s" style="width:89.3%;background:var(--ac2)"></i></div><span class="v"><b>0,2540</b></span>
+</div>
+<p class="sub">Escala de 0 a 0,284. Árboles por fold: 100 / 200 / 200 / 200.</p>
+
+<h2>6. Comparación con los otros modelos</h2>
+<div class="scroll"><table>
+<tr><th>Modelo</th><th>ago</th><th>sep</th><th>oct</th><th>nov</th><th>Media</th><th>Δ sup − modelo</th><th>Folds a favor</th></tr>
+<tr class="top"><td>LightGBM Superficial</td><td>0,2632</td><td>0,2502</td><td>0,2649</td><td>0,2375</td><td>0,2540</td><td>—</td><td>—</td></tr>
+<tr><td>CatBoost</td><td>0,2657</td><td>0,2514</td><td>0,2589</td><td>0,2317</td><td>0,2519</td><td>+0,0021</td><td>2/4</td></tr>
+<tr><td>LightGBM sin regularizar</td><td>0,2602</td><td>0,2482</td><td>0,2597</td><td>0,2390</td><td>0,2518</td><td>+0,0022</td><td>3/4</td></tr>
+<tr><td>LightGBM regularizado</td><td>0,2596</td><td>0,2492</td><td>0,2603</td><td>0,2362</td><td>0,2513</td><td>+0,0027</td><td>4/4</td></tr>
+<tr><td>XGBoost</td><td>0,2597</td><td>0,2478</td><td>0,2589</td><td>0,2315</td><td>0,2494</td><td>+0,0046</td><td>4/4</td></tr>
+<tr><td>RandomForest</td><td>0,2522</td><td>0,2211</td><td>0,2446</td><td>0,2100</td><td>0,2320</td><td>+0,0221</td><td>4/4</td></tr>
+</table></div>
+
+<h3>Cómo leerlo</h3>
+<ul>
+  <li>El SE del Gini medio de 4 folds es ≈ 0,008 y el de una diferencia pareada entre modelos ≈ 0,002–0,0025. Las ventajas de +0,002 a +0,005 sobre CatBoost y los LightGBM/XGBoost <b>no llegan a 2 SE</b>: son un empate técnico.</li>
+  <li>RandomForest es claramente peor (−0,022 y peor en los cuatro meses).</li>
+  <li>La prueba formal (<code>validacion_modelos/INFORME_ROBUSTEZ.md</code>, con una versión previa del pipeline) da, para el superficial:
+    <b>+0,0092</b> frente a <code>lgb_reg</code> con <code>dias_ultima_interaccion</code> (p_Holm = 0,005, 4/4 folds) y <b>+0,0055</b> frente a CatBoost (p_Holm = 0,21, no significativo).</li>
+</ul>
+
+<h2>7. Robustez</h2>
+<div class="scroll"><table>
+<tr><th>Prueba</th><th>Resultado</th></tr>
+<tr><td>Gini "tal cual" (script 20)</td><td>0,2540</td></tr>
+<tr><td>Escenario (f): variable permutada + 18,6 % de clientes nuevos</td><td>0,2531 (caída de 0,0008, dentro de 2 SE = 0,0039)</td></tr>
+<tr><td>Estabilidad del top-10 % de diciembre (R4)</td><td>94,9 % entre semillas y 82,5 % entre bootstraps; <span class="warn">no pasa el umbral</span>, igual que los otros candidatos</td></tr>
+<tr><td>Dispersión entre semillas del Gini medio</td><td>≤ 0,002 en LightGBM</td></tr>
+</table></div>
+<div class="note">El Gini del escenario (f) viene de folds pasados manipulados para parecerse a diciembre. No es un resultado sobre diciembre real.</div>
+
+<h2>8. Entrega</h2>
+<ul>
+  <li><code>resultados_reportes/candidata_20261007/submission_candidata.csv</code>: 9.900 filas, columnas <code>id_cliente,prediccion</code>, mismo orden que <code>test.csv</code>, valores en [0, 1].</li>
+  <li>Parecida a la entrega actual: Pearson 0,991 y Spearman 0,965 entre ambas.</li>
+  <li><b>No reemplaza todavía</b> a <code>submission_final.csv</code>. La regla del proyecto exige un Gini medio mayor en más de 0,003 sin que ningún fold empeore. Frente a <code>lgb_reg</code> con dui se cumple (+0,0092, 4/4 folds); frente a <code>LightGBM_Regularizado</code> de esta misma corrida es +0,0027, bajo el umbral.</li>
+</ul>
+
+<h2>9. Cómo presentar el resultado</h2>
+<ol>
+  <li>Define el Gini como 2·AUC − 1 y aclara que el de diciembre no se puede medir.</li>
+  <li>Reporta la media con su intervalo y el peor fold: "Gini ≈ 0,254 (IC95 % 0,238–0,268); los cuatro meses están entre 0,238 y 0,265".</li>
+  <li>Explica que la validación es temporal y sin fuga de información.</li>
+  <li>No afirmes mejora clara frente a CatBoost, LightGBM o XGBoost; la elección se apoya en simplicidad, estabilidad y la mejor media.</li>
+</ol>
+
+<h2>10. Limitaciones</h2>
+<ul>
+  <li>La señal es débil (AUC ≈ 0,63); el techo de Gini parece estar en torno a 0,25–0,26 con estas variables.</li>
+  <li>Se corrió con <code>--trials 0</code> (sin Optuna). Una búsqueda de hiperparámetros podría cambiar el ganador, aunque las diferencias esperadas son del orden del ruido.</li>
+  <li>El 18,6 % de clientes de test es nuevo y no tiene historial; el modelo estático no depende de él, pero no hay validación específica sobre ese grupo en esta corrida.</li>
+</ul>
+
+<footer>Fuentes: <code>resultados_validacion_DF_WCB.csv</code>, <code>bootstrap_gini.csv</code>, <code>log.txt</code> (carpeta <code>candidata_20261007</code>) y <code>validacion_modelos/resultados/</code>.</footer>
+</main>
+</body>
+</html>

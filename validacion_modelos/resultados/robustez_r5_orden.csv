@@ -1,0 +1,11 @@
+variable,segmento,tau_kendall_vs_global,orden_segmento,mejor_global,mejor_segmento,delta_mejorglobal_vs_mejorseg,ic95_inf,ic95_sup
+nuevo,nuevo,0.39999999999999997,lgb_sup_sin_dui > catboost_sin_dui > catboost > lgb_reg > ebm_sin_dui,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+nuevo,antiguo,0.9999999999999999,lgb_sup_sin_dui > ebm_sin_dui > catboost_sin_dui > catboost > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+banda_riesgo,low,0.7999999999999999,lgb_sup_sin_dui > ebm_sin_dui > catboost > catboost_sin_dui > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+banda_riesgo,medium,0.9999999999999999,lgb_sup_sin_dui > ebm_sin_dui > catboost_sin_dui > catboost > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+banda_riesgo,high,0.19999999999999998,catboost_sin_dui > lgb_sup_sin_dui > catboost > lgb_reg > ebm_sin_dui,lgb_sup_sin_dui,catboost_sin_dui,-0.006696095857837925,-0.01639894297086552,0.003115473984535573
+numero_productos,1,0.9999999999999999,lgb_sup_sin_dui > ebm_sin_dui > catboost_sin_dui > catboost > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+numero_productos,2,0.7999999999999999,lgb_sup_sin_dui > catboost_sin_dui > ebm_sin_dui > catboost > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+numero_productos,3+,0.39999999999999997,catboost > lgb_sup_sin_dui > ebm_sin_dui > catboost_sin_dui > lgb_reg,lgb_sup_sin_dui,catboost,-7.994102861197394e-05,-0.00630525423179522,0.006255391250626709
+activo_movil,True,0.9999999999999999,lgb_sup_sin_dui > ebm_sin_dui > catboost_sin_dui > catboost > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
+activo_movil,False,0.7999999999999999,lgb_sup_sin_dui > catboost_sin_dui > ebm_sin_dui > catboost > lgb_reg,lgb_sup_sin_dui,lgb_sup_sin_dui,0.0,0.0,0.0
