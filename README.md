@@ -146,24 +146,26 @@ python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_re
 | `--datos` | `.` | Carpeta donde están los CSV de entrada. |
 | `--salida` | `submission.csv` | Ruta del archivo de entrega. Los archivos auxiliares se guardan en la misma carpeta. |
 | `--trials` | `30` | Nº de pruebas de Optuna para ajustar LightGBM. `0` desactiva Optuna (más rápido). |
-| `--folds` | `4` | Nº de folds walk-forward (4 = dic, nov, oct, sep). |
+| `--n-folds` | `4` | Nº de folds walk-forward (4 = ago, sep, oct, nov). |
 | `--modo-features` | `estatico` | `"estatico"` (solo originales + valor actual interacción) o `"temporal"` (con lags/deltas/rolling). |
 | `--top-k` | `80` | Máximo de variables a conservar tras la selección. |
 | `--n-seeds` | `3` | Semillas que se promedian en el modelo final. |
 | `--semilla` | `42` | Semilla base (reproducibilidad). |
-| `--bootstrap-ic` | `False` | Activar bootstrap por cliente para IC95% en validación. |
-| `--n-bootstrap` | `1000` | Nº de iteraciones bootstrap para IC95%. |
+| `--excluir` | `dias_ultima_interaccion` | Columnas que se quitan de X (y sus derivadas). Sin valores (`--excluir`) no se quita nada. |
+| `--grid-arboles` | `25 50 75 100 150 200 300 400 600 800` | Rejilla de nº de árboles donde se mide la curva Gini por fold. |
+| `--n-bootstrap` | `500` | Réplicas del bootstrap de clientes (con reemplazo) para la regla 1-SE y el IC95 %. |
+| `--bootstrap-ic` | `False` | Legacy, sin efecto: el IC95 % se calcula siempre. |
 
 Ejemplos útiles:
 ```bash
 # Corrida rápida para probar cambios (sin Optuna, 1 fold, 1 semilla, modo estático)
-python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/prueba.csv --trials 0 --n-seeds 1 --folds 1 --modo-features estatico
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/prueba.csv --trials 0 --n-seeds 1 --n-folds 1 --modo-features estatico
 
 # Validación walk-forward completa (4 folds, sin Optuna)
-python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission_candidata.csv --trials 0 --n-seeds 3 --folds 4 --modo-features estatico
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission_candidata.csv --trials 0 --n-seeds 3 --n-folds 4 --modo-features estatico
 
-# Pipeline completo con Optuna, bootstrap IC y modo estático (producción)
-python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission_candidata.csv --trials 30 --n-seeds 3 --folds 4 --modo-features estatico --bootstrap-ic --n-bootstrap 1000
+# Pipeline completo con Optuna y modo estático (producción)
+python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_reportes/submission_candidata.csv --trials 30 --n-seeds 3 --n-folds 4 --modo-features estatico
 ```
 
 ### Qué hace, paso a paso
@@ -171,8 +173,8 @@ python pipelines/Pipeline_DF_WCB.py --datos datos_entrada --salida resultados_re
 1. **Carga y validación:** comprueba columnas, que no haya duplicados cliente-mes, estructura de panel (test > max train mes, sin huecos, sin post-conversión, nuevos en test), y muestra diagnóstico (entradas nuevos por mes, hazard por tenure, dinámicas, pisos/topes).
 2. **Features:** según `--modo-features`: `estatico` = solo columnas originales + One-Hot + valor actual de `dias_ultima_interaccion`; `temporal` = añade lags/deltas/rolling **solo de variables dinámicas detectadas** (hoy solo `dias_ultima_interaccion`).
 3. **Selección:** elimina constantes, luego variables con correlación de Pearson > 0,95 (loguea pares base/roll_mean), luego selecciona por importancia (gain o permutación opcional).
-4. **Validación:** walk-forward (folds temporales). Por fold: entrena y compara LightGBM, XGBoost, CatBoost, RandomForest + Optuna (sobre media AUC en folds); reporta AUC, Gini, IC95 % (bootstrap por cliente, 200 réplicas), best_iter.
-5. **Entrega:** reentrena el ganador con el 100 % de `train.csv` (n_iter = mediana best_iter × factor_datos), predice `test.csv` y exporta `submission.csv` con comprobaciones estrictas (columnas exactas, orden, rango, sin nulos, nunique > 9000, sha256 en log).
+4. **Validación:** walk-forward (folds temporales). Compara LightGBM (regularizado, sin regularizar y superficial), XGBoost, CatBoost, RandomForest y opcionalmente Optuna. Sin early stopping: cada fold se entrena hasta el máximo de `--grid-arboles` y se mide el Gini en cada punto de la rejilla. El Gini de cada fold usa el nº de árboles elegido (regla 1-SE) con la curva media de los **demás** folds. La tabla `resultados_validacion_DF_WCB.csv` da el Gini **medio** de los folds, el peor fold, el Gini de cada mes, el IC95 % (bootstrap de clientes con reemplazo, pareado entre modelos) y los árboles por fold. El ganador es el de mayor Gini medio.
+5. **Entrega:** reentrena el ganador con el 100 % de `train.csv` (n_iter = n elegido con la curva media de todos los folds × filas totales / filas medias por fold), predice `test.csv` y exporta `submission.csv` con comprobaciones estrictas (columnas exactas, orden, rango, sin nulos). También escribe `bootstrap_gini.csv` (réplicas reales del ganador) y `curvas_arboles_DF_WCB.csv`.
 
 ---
 
