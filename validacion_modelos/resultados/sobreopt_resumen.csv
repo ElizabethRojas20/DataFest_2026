@@ -1,0 +1,22 @@
+prueba,medida,valor,criterio,pasa
+info,N candidatos (incl. referencia),37,,
+info,ganador por Gini medio,r3_learning_rate_alto,,
+info,dif ganador vs referencia,0.008571481446112417,,
+info,dif lgb_sup_sin_dui vs referencia,0.005260264075905352,,
+P2 PBO/CSCV,PBO,0.13744588744588745,< 0.1 fiable; > 0.3 ruido,False
+P2 PBO/CSCV,pendiente OOS~IS del ganador IS,-0.9734234941789717,> 0 (sin degradación sistemática),False
+P2 PBO/CSCV,P(ganador IS pierde OOS frente a referencia),0.022727272727272728,"< 0,05",True
+P3 snooping,p Reality Check (White),0.0745,"< 0,05",False
+P3 snooping,p SPA consistente (Hansen),0.025,"< 0,05",True
+P3 snooping,p Romano-Wolf lgb_sup_sin_dui,0.2135,"< 0,05",False
+P3 snooping,"candidatos con p Romano-Wolf < 0,05",4,,
+P4 deflactado,N efectivo,2.101484420056277,,
+P4 deflactado,E[max dif] bajo H0 (fórmula),0.0017301274783408467,,
+P4 deflactado,E[max dif] bajo H0 (bootstrap) / p95,0.0043 / 0.0093,,
+P4 deflactado,z deflactado del ganador,2.233899888956144,> 1.645,True
+P4 deflactado,z deflactado de lgb_sup_sin_dui,1.2566153457079101,> 1.645,False
+P6 MCS,modelos en el MCS al 90 %,34,,
+P6 MCS,referencia fuera del MCS,False,True,False
+P6 MCS,lgb_sup_sin_dui dentro del MCS,True,True,True
+P6 prob. mejor,P(lgb_sup_sin_dui es el mejor),0.0,,
+P6 prob. mejor,P(referencia es la mejor),0.0005,,
