@@ -1,14 +1,8 @@
 # ============================================================
 # .gitignore — DataFest: propensión de conversión
-# Regla general: código, docs, modelos ligeros y resultados. Datos pesados y arrays .npy ignorados.
+# Regla general: código, docs, datos del concurso, modelos y resultados van al repositorio
+# (es público para que otros agentes puedan usarlo; los datos no son confidenciales).
 # ============================================================
-
-# ---------- Datos pesados / confidenciales ----------
-datos_entrada/*.csv
-!datos_entrada/sample_submission.csv
-
-# ---------- Arrays numpy pesados ----------
-modelos/*.npy
 
 # ---------- Secretos y credenciales (NUNCA subir) ----------
 .env
