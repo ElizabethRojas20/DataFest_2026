@@ -1,0 +1,98 @@
+12:58:45 | INFO | train=(110100, 25) | test=(9900, 24) | memoria train=34.5 MB
+12:58:45 | INFO | Tasa de conversión por mes:
+          mean   sum   size
+mes                        
+202601  0.1462  1521  10400
+202602  0.1574  1543   9800
+202603  0.1483  1527  10300
+202604  0.1534  1473   9600
+202605  0.1568  1584  10100
+202606  0.1546  1600  10350
+202607  0.1454  1410   9700
+202608  0.1442  1449  10050
+202609  0.1407  1393   9900
+202610  0.1565  1628  10400
+202611  0.1515  1439   9500
+12:58:45 | INFO | Filas de clientes DESPUÉS de su conversión: 0 (si es 0, convertidos no reaparecen)
+12:58:45 | INFO | % de clientes de test con historial en train: 81.4%
+12:58:45 | INFO | Cardinalidad ocupacion              = 5
+12:58:45 | INFO | Cardinalidad region                 = 5
+12:58:45 | INFO | Cardinalidad canal_adquisicion      = 5
+12:58:45 | INFO | Cardinalidad banda_riesgo           = 3
+12:58:45 | INFO | Cardinalidad dispositivo_principal  = 4
+12:58:45 | INFO | Modo 'estatico': sin features temporales (solo variables originales + OHE + TE)
+12:58:45 | INFO | Features temporales: 0 columnas
+12:58:45 | INFO | One-Hot: ['ocupacion', 'region', 'canal_adquisicion', 'banda_riesgo', 'dispositivo_principal'] | Target Encoding: []
+12:58:45 | INFO | Columnas excluidas: ['dias_ultima_interaccion']
+12:58:46 | INFO | Dataset: X_train=(110100, 38) | X_test=(9900, 38) | 8.5 MB | 0.1s
+12:58:46 | INFO | Walk-forward CV: 4 folds, meses de validación: [202608 202609 202610 202611]
+12:58:46 | INFO | Varianza cero: -0 ([])
+12:58:46 | INFO | Correlación > 0.95: -0 ([])
+12:59:04 | INFO | Top-10 importancia permutación:
+numero_productos           0.060048
+dias_ultima_transaccion    0.054406
+banda_riesgo_low           0.039906
+banda_riesgo_high          0.030582
+saldo_promedio             0.024193
+ingresos                   0.023566
+ratio_deuda_ingresos       0.023131
+antiguedad_cuenta_meses    0.023108
+edad                       0.021821
+distancia_sucursal_km      0.021391
+12:59:04 | INFO | Top-80 por importancia permutación: quedan 38 de 38 iniciales
+12:59:04 | INFO | Top 10 importancias (permutación):
+numero_productos           0.060048
+dias_ultima_transaccion    0.054406
+banda_riesgo_low           0.039906
+banda_riesgo_high          0.030582
+saldo_promedio             0.024193
+ingresos                   0.023566
+ratio_deuda_ingresos       0.023131
+antiguedad_cuenta_meses    0.023108
+edad                       0.021821
+distancia_sucursal_km      0.021391
+12:59:29 | INFO |   LightGBM_Regularizado    fold 1 (mes 202608): Gini=0.2596 con 25 árboles
+12:59:29 | INFO |   LightGBM_Regularizado    fold 2 (mes 202609): Gini=0.2492 con 100 árboles
+12:59:29 | INFO |   LightGBM_Regularizado    fold 3 (mes 202610): Gini=0.2603 con 25 árboles
+12:59:29 | INFO |   LightGBM_Regularizado    fold 4 (mes 202611): Gini=0.2362 con 25 árboles
+12:59:29 | INFO | LightGBM_Regularizado    Gini medio=0.2513 [IC95 0.2361; 0.2666] | peor fold=0.2362 | árboles finales=25
+12:59:48 | INFO |   LightGBM_Sin_Regularizar fold 1 (mes 202608): Gini=0.2602 con 25 árboles
+12:59:48 | INFO |   LightGBM_Sin_Regularizar fold 2 (mes 202609): Gini=0.2482 con 25 árboles
+12:59:48 | INFO |   LightGBM_Sin_Regularizar fold 3 (mes 202610): Gini=0.2597 con 25 árboles
+12:59:48 | INFO |   LightGBM_Sin_Regularizar fold 4 (mes 202611): Gini=0.2390 con 25 árboles
+12:59:48 | INFO | LightGBM_Sin_Regularizar Gini medio=0.2518 [IC95 0.2358; 0.2663] | peor fold=0.2390 | árboles finales=25
+13:00:00 | INFO |   LightGBM_Superficial     fold 1 (mes 202608): Gini=0.2632 con 100 árboles
+13:00:00 | INFO |   LightGBM_Superficial     fold 2 (mes 202609): Gini=0.2502 con 200 árboles
+13:00:00 | INFO |   LightGBM_Superficial     fold 3 (mes 202610): Gini=0.2649 con 200 árboles
+13:00:00 | INFO |   LightGBM_Superficial     fold 4 (mes 202611): Gini=0.2375 con 200 árboles
+13:00:00 | INFO | LightGBM_Superficial     Gini medio=0.2540 [IC95 0.2379; 0.2682] | peor fold=0.2375 | árboles finales=200
+13:00:21 | INFO |   XGBoost                  fold 1 (mes 202608): Gini=0.2597 con 50 árboles
+13:00:21 | INFO |   XGBoost                  fold 2 (mes 202609): Gini=0.2478 con 25 árboles
+13:00:21 | INFO |   XGBoost                  fold 3 (mes 202610): Gini=0.2589 con 50 árboles
+13:00:21 | INFO |   XGBoost                  fold 4 (mes 202611): Gini=0.2315 con 50 árboles
+13:00:21 | INFO | XGBoost                  Gini medio=0.2494 [IC95 0.2343; 0.2649] | peor fold=0.2315 | árboles finales=50
+13:01:10 | INFO |   CatBoost                 fold 1 (mes 202608): Gini=0.2657 con 150 árboles
+13:01:10 | INFO |   CatBoost                 fold 2 (mes 202609): Gini=0.2514 con 150 árboles
+13:01:10 | INFO |   CatBoost                 fold 3 (mes 202610): Gini=0.2589 con 150 árboles
+13:01:10 | INFO |   CatBoost                 fold 4 (mes 202611): Gini=0.2317 con 150 árboles
+13:01:10 | INFO | CatBoost                 Gini medio=0.2519 [IC95 0.2359; 0.2673] | peor fold=0.2317 | árboles finales=150
+13:01:39 | INFO |   RandomForest             fold 1 (mes 202608): Gini=0.2522 con 300 árboles
+13:01:39 | INFO |   RandomForest             fold 2 (mes 202609): Gini=0.2211 con 300 árboles
+13:01:39 | INFO |   RandomForest             fold 3 (mes 202610): Gini=0.2446 con 300 árboles
+13:01:39 | INFO |   RandomForest             fold 4 (mes 202611): Gini=0.2100 con 300 árboles
+13:01:39 | INFO | RandomForest             Gini medio=0.2320 [IC95 0.2150; 0.2483] | peor fold=0.2100 | árboles finales=300
+13:01:39 | INFO | Resultados en walk-forward CV (4 folds):
+                             auc    gini  gini_peor_fold  gini_ic_lower  gini_ic_upper  mejor_iter    arboles_folds  gini_202608  gini_202609  gini_202610  gini_202611
+LightGBM_Superficial      0.6270  0.2540          0.2375         0.2379         0.2682         200  100/200/200/200       0.2632       0.2502       0.2649       0.2375
+CatBoost                  0.6260  0.2519          0.2317         0.2359         0.2673         150  150/150/150/150       0.2657       0.2514       0.2589       0.2317
+LightGBM_Sin_Regularizar  0.6259  0.2518          0.2390         0.2358         0.2663          25      25/25/25/25       0.2602       0.2482       0.2597       0.2390
+LightGBM_Regularizado     0.6257  0.2513          0.2362         0.2361         0.2666          25     25/100/25/25       0.2596       0.2492       0.2603       0.2362
+XGBoost                   0.6247  0.2494          0.2315         0.2343         0.2649          50      50/25/50/50       0.2597       0.2478       0.2589       0.2315
+RandomForest              0.6160  0.2320          0.2100         0.2150         0.2483         300  300/300/300/300       0.2522       0.2211       0.2446       0.2100
+13:01:39 | INFO | Modelo ganador: LightGBM_Superficial (Gini medio=0.2540 | peor fold=0.2375 | 200 árboles en CV x 1.29)
+13:01:41 | INFO | Modelo final lightgbm: semilla 1/3 lista
+13:01:45 | INFO | Modelo final lightgbm: semilla 2/3 lista
+13:01:49 | INFO | Modelo final lightgbm: semilla 3/3 lista
+13:01:49 | INFO | Submission guardado en resultados_reportes\candidata_20261007\submission_candidata.csv (9900 filas)
+13:01:50 | INFO | Predicciones de validación guardadas en resultados_reportes\candidata_20261007\val_predictions.csv (239100 filas)
+13:01:50 | INFO | Pipeline completo en 3.1 min
